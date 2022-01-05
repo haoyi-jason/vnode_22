@@ -8,7 +8,7 @@
 #define WLAN_AP         0x0
 #define WLAN_STA        0x10
 
-#define GLOBAL_BUFF_LEN       7260
+#define GLOBAL_BUFF_LEN       8000
 
 #define WLAN_STA_STATIC 0x10
 #define WLAN_STA_DHCP   0x11
@@ -29,7 +29,9 @@
 #define  SOCKET_TX              EVENT_MASK(2)
 #define  SOCKET_RX              EVENT_MASK(3)
 #define  SOCKET_READ            EVENT_MASK(4)
-#define EV_WLAN_RECEIVED        EVENT_MASK(5)
+#define  EV_WLAN_RECEIVED       EVENT_MASK(5)
+#define  EV_STA_CONNECTED       EVENT_MASK(6)
+#define  EV_STA_DISCONNECTED    EVENT_MASK(7)
 // BT Events
 #define EVT_RSI_BT_ON_CONN      EVENT_MASK(10)
 #define EVT_RSI_BT_PINCODE_REQ  EVENT_MASK(11)

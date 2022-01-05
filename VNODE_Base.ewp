@@ -17853,7 +17853,34 @@
             </group>
         </group>
         <group>
-            <name>ex</name>
+            <name>ext</name>
+            <group>
+                <name>fatfs</name>
+                <file>
+                    <name>$extsource$\ChibiOS\chibios203\ext\fatfs\src\diskio.c</name>
+                    <excluded>
+                        <configuration>VSS_PORT</configuration>
+                    </excluded>
+                </file>
+                <file>
+                    <name>$extsource$\ChibiOS\chibios203\ext\fatfs\src\diskio.h</name>
+                </file>
+                <file>
+                    <name>$extsource$\ChibiOS\chibios203\ext\fatfs\src\ff.c</name>
+                </file>
+                <file>
+                    <name>$extsource$\ChibiOS\chibios203\ext\fatfs\src\ff.h</name>
+                </file>
+                <file>
+                    <name>$extsource$\ChibiOS\chibios203\ext\fatfs\src\ffconf_template.h</name>
+                </file>
+                <file>
+                    <name>$extsource$\ChibiOS\chibios203\ext\fatfs\src\ffsystem.c</name>
+                </file>
+                <file>
+                    <name>$extsource$\ChibiOS\chibios203\ext\fatfs\src\ffunicode.c</name>
+                </file>
+            </group>
         </group>
         <group>
             <name>hal</name>
@@ -19198,6 +19225,9 @@
                 <name>$PROJ_DIR$\include\VSS\mcuconf.h</name>
             </file>
         </group>
+    </group>
+    <group>
+        <name>FATFs</name>
     </group>
     <group>
         <name>Redpine</name>

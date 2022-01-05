@@ -8,6 +8,7 @@
 //#include "usbcfg.h"
 #include "ylib/eeprom/at24_eep.h"
 #include "task_wireless.h"
+#include "task_storage.h"
 
 #define NVM_FLAG        0xAB
 struct _nvmParam{
@@ -26,6 +27,7 @@ static struct _nvmParam nvmParam, *app_nvmParam;
 
 void cmd_config(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_start(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
+void cmd_start_log(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_stop(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_read(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 
@@ -34,6 +36,7 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x01,0,0},cmd_config}, // adxl param
   {{0xab,0xba,0xA2,0x40,0,0},cmd_config}, // module param
   {{0xab,0xba,0xA1,0x01,0,0},cmd_start}, // start
+  {{0xab,0xba,0xA1,0x02,0,0},cmd_start}, // start log to sd
   {{0xab,0xba,0xA1,0x00,0,0},cmd_stop}, // stop
   {{0xab,0xba,0x01,0x00,0,0},cmd_read},
   {{0xab,0xba,0x01,0x00,0,0},NULL},
@@ -44,7 +47,7 @@ static const BinShellConfig shell_cfg = {
   commands
 };
 
-struct {
+struct _runTime{
   uint8_t state;
   uint8_t *rxPtr;
   uint8_t *txPtr;
@@ -54,6 +57,7 @@ struct {
   uint16_t rxSz;
   event_source_t es_sensor;
   event_listener_t el_sensor;
+  event_listener_t el_sdfs;
   struct {
     uint16_t ms_on;
     uint16_t ms_off;
@@ -62,7 +66,9 @@ struct {
   uint8_t activatedSensor;
   uint8_t sensorReady;
   thread_t *shelltp;
-}runTime;
+};
+
+static struct _runTime runTime, *app_runTime;
 
 static SPIConfig spicfg = {
   false,
@@ -200,6 +206,7 @@ static THD_FUNCTION(procOperation ,p)
 //  event_listener_t elSensor;
   eventflags_t flags;
   //activeSensor = SENSOR_ISM330;
+  activeSensor = SENSOR_ADXL355;
   if(activeSensor == SENSOR_ADXL355){
     chEvtRegisterMask(&adxl.evsource,&runTime.el_sensor,EV_ADXL_FIFO_FULL);
 //    runTime.ledBlink.ms_on = 500;
@@ -246,8 +253,6 @@ static THD_FUNCTION(procOperation ,p)
         switch(opMode){
         case OP_STREAM:
           bsz = sz*9; // read x/y/z combo
-          //if(bsz > 144) 
-            //bsz = 144;
           if(bsz >= 144){
             adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],144); // each record has 9-bytes (x/y/z)*3
             runTime.rxSz += 144;
@@ -423,11 +428,11 @@ static THD_FUNCTION(procOperation ,p)
     chEvtUnregister(&adxl.evsource,&runTime.el_sensor);
 }
 
-static void startTransfer(void)
+static void startTransfer(BaseSequentialStream *stream)
 {
 
   if(!runTime.opThread){
-    //runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO-1,procOperation,&SDU1);
+    runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO,procOperation,stream);
   }
 }
 
@@ -445,11 +450,15 @@ static THD_WORKING_AREA(waShell,1024);
 void vnode_app_init()
 {
   app_nvmParam = &nvmParam;
+  app_runTime = &runTime;
   at24eep_init(&I2CD1,32,1024,0x50,2);
   load_settings();
   
   // start wireless
-  task_wireless_init(COMM_USE_BT);
+  task_wireless_init(nvmParam.nodeParam.commType);
+//  task_wireless_init(COMM_USE_WIFI);
+  
+  
   
   bincmd_shellInit();
   
@@ -462,7 +471,27 @@ void vnode_app_init()
   }
   runTime.shelltp = chThdCreateStatic(waShell, sizeof(waShell),NORMALPRIO+1,binshellProc,(void*)&shell_cfg);
 
+  // start SD Logger
+  fs_init();
+  
+  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(0) | EVENT_MASK(1));
+//  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(1));
   while(1){
+    chEvtWaitAny(ALL_EVENTS);
+    eventflags_t flags = chEvtGetAndClearFlags(&runTime.el_sdfs);
+    if(flags & EVENT_MASK(0)){// insert
+      sdfs_loadCard(&SDFS1);
+    }
+    if(flags & EVENT_MASK(1)){// write
+      size_t n;
+      chSysLock();
+      uint8_t *buf = obqGetFullBufferI(&SDFS1.oqueue,&n);
+      memcpy(runTime.buffer,buf,n);
+      obqReleaseEmptyBufferI(&SDFS1.oqueue);
+      chSysUnlock();    
+      
+      sdfs_write(&SDFS1, "test.txt", runTime.buffer, n);
+    }
     chThdSleepMilliseconds(50);
   }
 }
@@ -583,11 +612,11 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
   }
   
 }
+
 void cmd_start(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
 {
   if(!runTime.opThread){
     BinCommandHeader header;
-//    runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO-1,procOperation,NULL);
     header.magic1 = MAGIC1;
     header.magic2 = MAGIC2;
     header.type = MASK_CMD_RET_OK;
@@ -595,7 +624,12 @@ void cmd_start(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
     header.len = CMD_STRUCT_SZ;
     header.chksum = checksum((uint8_t*)&header,header.len);
     streamWrite(chp,(uint8_t*)&header,8);
-    startTransfer();
+    if(hin->pid == 0x01){
+      startTransfer(chp);
+    }
+    else{
+      startTransfer((BaseSequentialStream*)&SDFS1);
+    }
   }
   else{
     BinCommandHeader header;
