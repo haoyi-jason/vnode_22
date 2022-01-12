@@ -7,7 +7,27 @@
 #define EV_SD_INS       EVENT_MASK(0)
 #define EV_SD_WRITE       EVENT_MASK(1)
 #define EV_SD_READ       EVENT_MASK(2)
+#define EV_SD_LS        EVENT_MASK(3)        
 
+enum fs_actions{
+  FS_OP_MOUNT,
+  FS_OP_OPENDIR,
+  FS_OP_LISTDIR,
+  FS_OP_READFILE,
+  FS_OP_WRITEFILE
+};
+
+#define FILE_OP_OK         0x10
+#define FILE_OP_ERR        0x20
+
+#define FILE_OP_CHDIR       0x10
+#define FILE_LIST          0x01
+#define FILE_OPEN          0x02
+#define FILE_READ          0x03
+#define FILE_WRITE         0x04
+#define FILE_REMOVE        0x05
+//#define FILE_CHDIR         0x06
+#define FILE_CLOSE         0x07
 
 #define SD_BUF_SIZE     1024
 
@@ -31,7 +51,9 @@ typedef struct {
   uint32_t capacity; \
   bool cardReady; \
   FATFS FileSystem; \
-  event_source_t evs_insertion;
+  event_source_t evs_insertion; \
+  uint8_t fileName[32]; \
+  uint32_t readOffset;
     
 #define _fs_driver_methods     \
   _base_asynchronous_channel_methods

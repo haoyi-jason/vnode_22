@@ -28,9 +28,6 @@ enum _state{
   STA_DISCONNECTED,
 };
 
-static void inotify(io_queue_t *qp){};
-static void onotify(io_queue_t *qp){};
-
 struct _runTime{
   uint8_t state;
   thread_t *self;
@@ -41,7 +38,7 @@ struct _runTime{
   //uint8_t ob[RSI_APP_BUF_SIZE];
   //uint8_t ib[RSI_APP_BUF_SIZE];
   struct{
-    uint8_t buffer[32];
+    uint8_t buffer[600];
     uint16_t size;
     uint8_t buff_in_use;
   }buffer;
@@ -225,11 +222,11 @@ void  rsi_wlan_sta_app_task(void *p)
   int32_t       pkt_type = 0; 
   int32_t       server_socket,new_socket,udp_socket;
   struct        rsi_sockaddr_in server_addr, client_addr,udp_server; 
-  int8_t        recv_buffer[128];
+  //int8_t        recv_buffer[128];
   uint32_t      recv_size;
   int32_t       addr_size;
   uint16_t      tcp_keep_alive_time = 1000 ; 
-  uint8_t       buffer[128];
+  //uint8_t       buffer[128];
   int32_t status;
 
   uint32_t ip=0,mask=0,gw=0;
@@ -253,7 +250,7 @@ void  rsi_wlan_sta_app_task(void *p)
   }
   uint8_t chNo = 0x01; // <<-
   msg_t errCode = MSG_OK;
-  rsi_rsp_scan_t *scan = (rsi_rsp_scan_t*)recv_buffer;
+  rsi_rsp_scan_t *scan = (rsi_rsp_scan_t*)runTime.buffer.buffer;
   thread_t *udpThread = NULL;
   bool udpActive = false;
   rsi_wlan_app_callbacks_init();
@@ -270,10 +267,10 @@ void  rsi_wlan_sta_app_task(void *p)
       }
       break;
     case 1:
-      memcpy(recv_buffer,nvmParam.wlan.passwd2,8);
-      recv_buffer[8] = 0x0;
+      memcpy(runTime.buffer.buffer,nvmParam.wlan.passwd2,8);
+      //recv_buffer[8] = 0x0;
 //      status = rsi_wlan_connect((int8_t*)nvmParam.wlan.prefix2,RSI_WPA2,recv_buffer);
-      status = rsi_wlan_connect((int8_t*)nvmParam.wlan.prefix2,nvmParam.wlan.secType & 0xf,recv_buffer);
+      status = rsi_wlan_connect((int8_t*)nvmParam.wlan.prefix2,nvmParam.wlan.secType & 0xf,runTime.buffer.buffer);
       if(status != RSI_SUCCESS){
         errCode = 0x2;
         chThdResume(&runTime.trp,errCode);
@@ -322,7 +319,7 @@ void  rsi_wlan_sta_app_task(void *p)
             stage = 4;
           }          
         }else{
-          status = rsi_sendto(udp_socket, (int8_t *)recv_buffer, (strlen(recv_buffer)), 0, (struct rsi_sockaddr *)&udp_server, sizeof(udp_server));
+          status = rsi_sendto(udp_socket, (int8_t *)runTime.buffer.buffer, (strlen(runTime.buffer.buffer)), 0, (struct rsi_sockaddr *)&udp_server, sizeof(udp_server));
           if(status < 0){
             status = rsi_wlan_get_status();
             rsi_shutdown(udp_socket,0);
@@ -708,7 +705,7 @@ int8_t rsi_wlan_init(void)
 void rsi_bt_app_on_conn (uint16_t resp_status, rsi_bt_event_bond_t *conn_event)
 {
   rsi_6byte_dev_address_to_ascii((int8_t*)runTime.rsi_bt.str_conn_bd_addr,conn_event->dev_addr);
-  chEvtSignal(runTime.self,EVT_RSI_BT_ON_CONN);
+  chEvtSignal(runTime.self,RSI_APP_EVENT_CONNECTED);
 }
 
 
@@ -788,7 +785,7 @@ void rsi_bt_on_ssp_complete (uint16_t resp_status, rsi_bt_event_ssp_complete_t *
 
 void rsi_bt_on_confirm_request (uint16_t resp_status, rsi_bt_event_user_confirmation_request_t *user_confirmation_request)
 {
-  chEvtSignal(runTime.self,RSI_APP_SSP_CONFIRM_REQ);
+  chEvtSignal(runTime.self,RSI_APP_EVENT_CONFIRM_REQUEST);
 }
 
 void rsi_bt_spp_slave (void *p)
@@ -927,7 +924,7 @@ void rsi_bt_spp_slave (void *p)
     eventmask_t evt = chEvtWaitAny(ALL_EVENTS);
     
     //! if any event is received, it will be served.
-    if(evt & EVT_RSI_BT_ON_CONN)
+    if(evt & RSI_APP_EVENT_CONNECTED)
     {
       
     }
@@ -967,18 +964,21 @@ void rsi_bt_spp_slave (void *p)
       if(evt & RSI_APP_EVENT_DISCONNECTED)
       {
         runTime.state = STA_DISCONNECTED;
+        
       }
 
       if(evt & RSI_APP_EVENT_SPP_CONN)
       {
         runTime.buffer.size = 0;
         runTime.state = STA_CONNECTED;
+        chEvtBroadcastFlags(&SDW1.es,RSI_APP_EVENT_SPP_CONN);
       }
       if(evt & RSI_APP_EVENT_SPP_DISCONN)
       {
         //! spp disconnected event
         runTime.state = STA_DISCONNECTED;
         memset(runTime.rsi_bt.str_conn_bd_addr,0,18);
+        chEvtBroadcastFlags(&SDW1.es,RSI_APP_EVENT_SPP_DISCONN);
       }
       if(evt & RSI_APP_EVENT_SPP_RX)
       {
@@ -986,14 +986,9 @@ void rsi_bt_spp_slave (void *p)
       }
       if(evt & RSI_APP_EVENT_SPP_TX)
       {
-          if(runTime.state == STA_CONNECTED){
-            size_t n;
-            chSysLock();
-            uint8_t *buf = obqGetFullBufferI(&SDW1.oqueue,&n);
-            memcpy(str,buf,n);
-            obqReleaseEmptyBufferI(&SDW1.oqueue);
-            chSysUnlock();
-            status = rsi_bt_spp_transfer (runTime.rsi_bt.str_conn_bd_addr, str,n);
+          if((runTime.state == STA_CONNECTED) && (runTime.buffer.buff_in_use==1)){
+            status = rsi_bt_spp_transfer (runTime.rsi_bt.str_conn_bd_addr, runTime.buffer.buffer,runTime.buffer.size);
+            runTime.buffer.buff_in_use = 0;
           }
       }
       if(evt & RSI_APP_EVENT_PASSKEY_REQUEST)
@@ -1008,7 +1003,7 @@ void rsi_bt_spp_slave (void *p)
         rsi_bt_accept_ssp_confirm((int8_t *)runTime.rsi_bt.str_conn_bd_addr);
 
       }
-      if(evt & RSI_APP_SSP_CONFIRM_REQ)
+      if(evt & RSI_APP_EVENT_CONFIRM_REQUEST)
       {
         rsi_bt_accept_ssp_confirm((int8_t *)runTime.rsi_bt.str_conn_bd_addr);
       }    
@@ -1069,8 +1064,6 @@ int32_t task_wireless_init(uint8_t commType)
   start_driver_task();
   //rsi_task_create(rsi_wireless_driver_task, "driver_task",RSI_DRIVER_TASK_STACK_SIZE, NULL, RSI_DRIVER_TASK_PRIORITY, &runTime.rsi_handle.rsi_driver);
     
-  //iqObjectInit(&runTime.iq,runTime.ib, RSI_APP_BUF_SIZE,inotify,NULL);
-  //iqObjectInit(&runTime.oq,runTime.ob, RSI_APP_BUF_SIZE,onotify,NULL);
   if(commType == COMM_USE_WIFI){
     rsi_wlan_init();
   }
@@ -1094,7 +1087,8 @@ static size_t _write(void *ip, const uint8_t *bp, size_t n)
 {
   SerialWLANDriver *sdwp = (SerialWLANDriver*)ip;
   size_t sz = obqWriteTimeout(&((SerialWLANDriver*)ip)->oqueue,bp,n,TIME_INFINITE);
-  obqPostFullBuffer(&sdwp->oqueue, sz);
+  //obqPostFullBuffer(&sdwp->oqueue, sz);
+  obqFlush(&sdwp->oqueue);
   return sz;
 }
 
@@ -1154,9 +1148,13 @@ static void ibnotify(io_buffers_queue_t *bqp)
 static void obnotify(io_buffers_queue_t *bqp)
 {
   SerialWLANDriver *sdwp = bqGetLinkX(bqp);
-//  chSysLock();
+  size_t n;
+  uint8_t *buf = obqGetFullBufferI(&SDW1.oqueue,&n);
+  memcpy(runTime.buffer.buffer,buf,n);
+  runTime.buffer.size = n;
+  runTime.buffer.buff_in_use = 1;
+  obqReleaseEmptyBufferI(&SDW1.oqueue);
   chEvtSignalI(runTime.self,RSI_APP_EVENT_SPP_TX);
-//  chSysUnlock();
 }
 
 
@@ -1168,6 +1166,8 @@ void sdwObjectInit(SerialWLANDriver *sdwp)
   osalEventObjectInit(&sdwp->event);
   ibqObjectInit(&sdwp->iqueue, true, sdwp->ib, RSI_APP_BUF_SIZE, 1, ibnotify, sdwp);
   obqObjectInit(&sdwp->oqueue, true, sdwp->ob, RSI_APP_BUF_SIZE, 1, obnotify, sdwp);
+  
+  chEvtObjectInit(&sdwp->es);
 }
 void sdwStart(SerialWLANDriver *sdwp, const SerialWLANConfig *config)
 {

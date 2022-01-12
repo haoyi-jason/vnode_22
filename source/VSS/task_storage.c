@@ -211,10 +211,10 @@ static void ibnotify(io_buffers_queue_t *bqp)
 static void obnotify(io_buffers_queue_t *bqp)
 {
   FSDriver *sdfsp = bqGetLinkX(bqp);
-  chSysLock();
+  //chSysLock();
   chEvtBroadcastFlagsI(&sdfsp->evs_insertion,EVENT_MASK(1));
  // chEvtSignalI(runTime.self,RSI_APP_EVENT_SPP_TX);
-  chSysUnlock();
+ // chSysUnlock();
 }
 
 static void sd_insert_handler(void *arg)
@@ -222,7 +222,20 @@ static void sd_insert_handler(void *arg)
   FSDriver *dev = (FSDriver*)arg;
   chSysLockFromISR();
   chEvtBroadcastFlagsI(&dev->evs_insertion,EVENT_MASK(0));
-  chSysUnlockFromISR();}
+  chSysUnlockFromISR();
+}
+
+void sdfsListFile(FSDriver *sdfsp)
+{
+  //chSysLockFromISR();
+  chEvtBroadcastFlags(&sdfsp->evs_insertion,EV_SD_LS);
+  //chSysUnlockFromISR();
+}
+
+void sdReadFile(FSDriver *sdfsp)
+{
+  chEvtBroadcastFlags(&sdfsp->evs_insertion,EV_SD_READ);
+}
 
 void sdfsInit(void){}
 
@@ -283,6 +296,8 @@ size_t sdfs_write(FSDriver *dev, char *fileName, uint8_t *buff, size_t sz)
   FRESULT res = f_open(&f,fileName,FA_WRITE | FA_OPEN_APPEND);
   if(res == FR_OK){
     res = f_write(&f,buff,sz,&SZ);
+    SZ = f.obj.objsize;
+    f_close(&f);
   }
   return SZ;
 }
@@ -292,6 +307,7 @@ size_t sdfs_read(FSDriver *dev, char *fileName, uint32_t offset, size_t readCoun
   if(!dev->cardReady) return 0;
   
 }
+
 
 
 

@@ -2,7 +2,7 @@
 #define _TASK_WIRELESS_
 
 #define GLOBAL_BUFF_LEN 8000
-#define RSI_APP_BUF_SIZE 512
+#define RSI_APP_BUF_SIZE 600
 #define RSI_BT_TASK_STACK_SIZE 1024
 #define RSI_BT_TASK_PRIORITY   NORMALPRIO+1
 #define WLAN_AP         0x0
@@ -33,17 +33,36 @@
 #define  EV_STA_CONNECTED       EVENT_MASK(6)
 #define  EV_STA_DISCONNECTED    EVENT_MASK(7)
 // BT Events
-#define EVT_RSI_BT_ON_CONN      EVENT_MASK(10)
-#define EVT_RSI_BT_PINCODE_REQ  EVENT_MASK(11)
-#define EVT_RSI_BT_LINKKEY_REQ  EVENT_MASK(12)
-#define EVT_RSI_BT_LINKKEY_SAVE EVENT_MASK(13)
-#define EVT_RSI_BT_AUTH_CMPT    EVENT_MASK(14)
-#define EVT_RSI_BT_DISCONN      EVENT_MASK(15)
-#define EVT_RSI_BT_CONN         EVENT_MASK(16)
-#define EVT_RSI_BT_SPP_DISCONN  EVENT_MASK(17)
-#define RSI_APP_EVENT_SPP_RX    EVENT_MASK(18)
-#define RSI_APP_EVENT_SPP_TX    EVENT_MASK(19)
-#define RSI_APP_SSP_CONFIRM_REQ EVENT_MASK(20)
+//#define EVT_RSI_BT_ON_CONN      EVENT_MASK(10)
+//#define EVT_RSI_BT_PINCODE_REQ  EVENT_MASK(11)
+//#define EVT_RSI_BT_LINKKEY_REQ  EVENT_MASK(12)
+//#define EVT_RSI_BT_LINKKEY_SAVE EVENT_MASK(13)
+//#define EVT_RSI_BT_AUTH_CMPT    EVENT_MASK(14)
+//#define EVT_RSI_BT_DISCONN      EVENT_MASK(15)
+//#define EVT_RSI_BT_CONN         EVENT_MASK(16)
+//#define EVT_RSI_BT_SPP_DISCONN  EVENT_MASK(17)
+//#define RSI_APP_EVENT_SPP_RX    EVENT_MASK(18)
+//#define RSI_APP_EVENT_SPP_TX    EVENT_MASK(19)
+//#define RSI_APP_SSP_CONFIRM_REQ EVENT_MASK(20)
+
+#define RSI_APP_EVENT_CONNECTED       EVENT_MASK(0)
+#define RSI_APP_EVENT_PINCODE_REQ     EVENT_MASK(1)
+#define RSI_APP_EVENT_LINKKEY_SAVE    EVENT_MASK(2)
+#define RSI_APP_EVENT_AUTH_COMPLT     EVENT_MASK(3)
+#define RSI_APP_EVENT_DISCONNECTED    EVENT_MASK(4)
+#define RSI_APP_EVENT_LINKKEY_REQ     EVENT_MASK(5)
+#define RSI_APP_EVENT_SPP_CONN        EVENT_MASK(6)
+#define RSI_APP_EVENT_SPP_DISCONN     EVENT_MASK(7)
+#define RSI_APP_EVENT_SPP_RX          EVENT_MASK(8)
+#define RSI_APP_EVENT_SPP_TX          EVENT_MASK(9)
+/** ssp related defines********/
+#define RSI_APP_EVENT_PASSKEY_DISPLAY EVENT_MASK(10)
+#define RSI_APP_EVENT_PASSKEY_REQUEST EVENT_MASK(11)
+#define RSI_APP_EVENT_SSP_COMPLETE    EVENT_MASK(12)
+#define RSI_APP_EVENT_CONFIRM_REQUEST EVENT_MASK(13)
+#define RSI_APP_EVENT_SPP_RX_REMAIN   EVENT_MASK(14)
+#define RSI_APP_EVENT_SPP_TXPTR         EVENT_MASK(15)
+#define RSI_APP_EVENT_SPP_TXCMD         EVENT_MASK(16)
 
 //! Channel Number
 #define CHANNEL_NO             11 
@@ -71,7 +90,7 @@
 #define RSI_SOCK_EVENT           BIT(2)
 
 //! Application buffers size
-#define RSI_APP_BUF_SIZE        320
+//#define RSI_APP_BUF_SIZE        320
 
 #define  ICMP_PING_REPLY    0
 
@@ -373,7 +392,8 @@ typedef struct{
   output_buffers_queue_t oqueue; \
   uint8_t ib[RSI_APP_BUF_SIZE]; \
   uint8_t ob[RSI_APP_BUF_SIZE]; \
-  const SerialWLANConfig *config;
+  const SerialWLANConfig *config; \
+  event_source_t es;
 
 #define _serial_wlan_driver_methods     \
   _base_asynchronous_channel_methods

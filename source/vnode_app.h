@@ -23,6 +23,8 @@ typedef struct {
   uint8_t opMode;
   uint8_t commType;
   uint8_t activeSensor;
+  char log_file_prefix[16];
+  uint32_t logFileSize;
 }node_param_t;
 
 typedef struct{

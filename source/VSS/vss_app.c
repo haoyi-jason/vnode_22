@@ -10,7 +10,7 @@
 #include "task_wireless.h"
 #include "task_storage.h"
 
-#define NVM_FLAG        0xAB
+#define NVM_FLAG        0xAC
 struct _nvmParam{
   uint8_t flag;
   node_param_t nodeParam;
@@ -18,12 +18,18 @@ struct _nvmParam{
   module_setting_t moduleParam;
 };
 
+static void startTransfer(BaseSequentialStream*);
+
 static struct _nvmParam nvmParam, *app_nvmParam;
 
 #define SHELL_WA_SIZE   THD_WORKING_AREA_SIZE(2048)
 
 #define EV_ADXL_FIFO_FULL EVENT_MASK(0)
 #define EV_ISM_FIFO_FULL EVENT_MASK(1)
+#define EV_FILE_LIST            EVENT_MASK(2)
+#define EV_FILE_READ            EVENT_MASK(3)
+#define EV_FILE_WRITE           EVENT_MASK(4)
+#define EV_USER_BUTTON          EVENT_MASK(11)
 
 void cmd_config(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_start(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
@@ -31,6 +37,9 @@ void cmd_start_log(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t 
 void cmd_stop(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_read(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 
+void cmd_list_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
+void cmd_read_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
+void cmd_write_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x00,0,0},cmd_config}, // node param
   {{0xab,0xba,0xA2,0x01,0,0},cmd_config}, // adxl param
@@ -39,6 +48,9 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA1,0x02,0,0},cmd_start}, // start log to sd
   {{0xab,0xba,0xA1,0x00,0,0},cmd_stop}, // stop
   {{0xab,0xba,0x01,0x00,0,0},cmd_read},
+  {{0xab,0xba,0xA3,0x11,0,0},cmd_list_file},
+  {{0xab,0xba,0xA3,0x03,0,0},cmd_read_file},
+  {{0xab,0xba,0xA3,0x04,0,0},cmd_write_file},
   {{0xab,0xba,0x01,0x00,0,0},NULL},
 };
 
@@ -48,16 +60,18 @@ static const BinShellConfig shell_cfg = {
 };
 
 struct _runTime{
+  thread_t *self;
   uint8_t state;
   uint8_t *rxPtr;
   uint8_t *txPtr;
   uint8_t *bufEnd;
-  uint8_t buffer[1200];
+  uint8_t buffer[600];
   mutex_t mutex;
   uint16_t rxSz;
   event_source_t es_sensor;
   event_listener_t el_sensor;
   event_listener_t el_sdfs;
+  event_listener_t el_wireless;
   struct {
     uint16_t ms_on;
     uint16_t ms_off;
@@ -66,6 +80,13 @@ struct _runTime{
   uint8_t activatedSensor;
   uint8_t sensorReady;
   thread_t *shelltp;
+  struct{
+    char writeFileName[64];
+    char readFileName[64];
+    uint32_t read_offset;
+    uint16_t read_count;
+  }logFile;
+  virtual_timer_t vt;
 };
 
 static struct _runTime runTime, *app_runTime;
@@ -106,6 +127,22 @@ const module_setting_t module_default = {
   "Grididea-AT32",
   "VSS-II" // supported config
 };
+
+static void blink_cb(void *arg)
+{
+  chSysLockFromISR();
+  palTogglePad(GPIOC,3);
+  chVTSetI(&runTime.vt, TIME_MS2I(500),blink_cb,NULL);
+  chSysUnlockFromISR();
+}
+
+static void user_button_isr(void *arg)
+{
+  chSysLockFromISR();
+  chEvtSignalI(runTime.self,EV_USER_BUTTON);
+  chSysUnlockFromISR();
+}
+
 static void load_settings()
 {
   uint16_t nvmSz = sizeof(nvmParam);
@@ -120,6 +157,8 @@ static void load_settings()
     nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
     nvmParam.nodeParam.commType = COM_IF_BT;
     nvmParam.nodeParam.opMode = OP_STREAM;
+    memcpy(nvmParam.nodeParam.log_file_prefix,"SensorNode\0",11);
+    nvmParam.nodeParam.logFileSize = 1024*1024*10;
     
     nvmParam.adxlParam.fs = 0x1;
     nvmParam.adxlParam.odr = ADXL355_ODR_500;
@@ -131,6 +170,7 @@ static void load_settings()
     //nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
     eepromWrite(OFFSET_NVM_CONFIG,nvmSz,(uint8_t*)&nvmParam);
   }
+  
 }
 
 static void save_settings(uint8_t option)
@@ -141,6 +181,148 @@ static void save_settings(uint8_t option)
     eepromWrite(OFFSET_NVM_CONFIG,sizeof(nvmParam),(uint8_t*)&nvmParam);
     //chSysUnlock();
   //  chSysEnable();
+}
+static void writeLogHeader()
+{
+  char *ptr = runTime.buffer;
+  size_t sz;
+  memset(ptr,0,512);
+  
+  ptr += chsnprintf(ptr, 512, "VSS LOG FILE REV 1.0\n");
+  
+  if(nvmParam.nodeParam.activeSensor == SENSOR_ADXL355){
+    ptr += chsnprintf(ptr,512,"SENSOR=ADXL355\n");
+    switch(nvmParam.adxlParam.fs){
+    case 1:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=2 G\n");break;
+    case 2:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=4 G\n");break;
+    case 3:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=8 G\n");break;
+    }
+    uint16_t odr = 4000/(1<<nvmParam.adxlParam.odr);
+    ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
+    ptr += chsnprintf(ptr,512,"HPF=0x%x\n",nvmParam.adxlParam.hpf);
+  }
+  
+  FRESULT fres;
+  FIL f;
+  fres = f_open(&f,runTime.logFile.writeFileName,FA_WRITE | FA_OPEN_APPEND);
+  if(fres == FR_OK){
+    f_lseek(&f,0);
+    f_write(&f,runTime.buffer,512,&sz);
+    f_close(&f);
+  }
+  
+}
+
+static void valid_log_fileName()
+{
+  RTCDateTime timespec;
+  struct tm now;
+  rtcGetTime(&RTCD1,&timespec);
+  rtcConvertDateTimeToStructTm(&timespec,&now,NULL);
+
+  chsnprintf(runTime.logFile.writeFileName,64,"%s_%04d%02d%02d-%02d%02d%02d.bin\0",
+             nvmParam.nodeParam.log_file_prefix,
+             now.tm_year+1900,
+             now.tm_mon+1,
+             now.tm_mday,
+             now.tm_hour,
+             now.tm_min,
+             now.tm_sec);
+  
+  FRESULT fres;
+  FIL f;
+  fres = f_open(&f,runTime.logFile.writeFileName,FA_READ | FA_WRITE | FA_CREATE_NEW);
+  if(fres != FR_OK){
+    while(1);
+  }
+  
+  fres = f_lseek(&f,512);
+  f_close(&f);
+}
+
+static void finish_log_file()
+{
+  char *ptr = runTime.buffer;
+  size_t sz;
+  memset(runTime.buffer,0,512);
+  ptr += chsnprintf(ptr,512,"SensorNode LOG FILE REV 1.1\n");
+  if(nvmParam.nodeParam.activeSensor == SENSOR_ADXL355){
+    ptr += chsnprintf(ptr,512,"SENSOR=ADXL355\n");
+    switch(nvmParam.adxlParam.fs){
+    case 1:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=2 G\n");break;
+    case 2:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=4 G\n");break;
+    case 3:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=8 G\n");break;
+    }
+    uint16_t odr = 4000/(1<<nvmParam.adxlParam.odr);
+    ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
+    ptr += chsnprintf(ptr,512,"HPF=0x%x\n",nvmParam.adxlParam.hpf);
+  }
+//  if(nvmParam.nodeParam.activeSensor & BMI160_ENABLED){
+//    ptr += chsnprintf(ptr,512,"SENSOR=BMI160\n");
+//    switch(appParam.imu.accel.range){
+//    case BMI160_ACCEL_RANGE_2G:
+//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=2 G\n");
+//      break;
+//    case BMI160_ACCEL_RANGE_4G:
+//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=4 G\n");
+//      break;
+//    case BMI160_ACCEL_RANGE_8G:
+//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=8 G\n");
+//      break;
+//    case BMI160_ACCEL_RANGE_16G:
+//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=16 G\n");
+//      break;
+//    }
+//    switch(appParam.imu.gyro.range){
+//    case BMI160_GYRO_RANGE_2000_DPS:
+//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=2000 DPS\n");
+//      break;
+//    case BMI160_GYRO_RANGE_1000_DPS:
+//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=1000 DPS\n");
+//      break;
+//    case BMI160_GYRO_RANGE_500_DPS:
+//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=500 DPS\n");
+//      break;
+//    case BMI160_GYRO_RANGE_250_DPS:
+//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=250 DPS\n");
+//      break;
+//    case BMI160_GYRO_RANGE_125_DPS:
+//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=125 DPS\n");
+//      break;
+//    }
+//    switch(appParam.imu.accel.odr){
+//    case BMI160_ACCEL_ODR_25HZ:
+//      ptr += chsnprintf(ptr,512,"DATA_RATE=25 SPS\n");
+//      break;
+//    case BMI160_ACCEL_ODR_50HZ:
+//      ptr += chsnprintf(ptr,512,"DATA_RATE=50 SPS\n");
+//      break;
+//    case BMI160_ACCEL_ODR_100HZ:
+//      ptr += chsnprintf(ptr,512,"DATA_RATE=100 SPS\n");
+//      break;
+//    case BMI160_ACCEL_ODR_200HZ:
+//      ptr += chsnprintf(ptr,512,"DATA_RATE=200 SPS\n");
+//      break;
+//    case BMI160_ACCEL_ODR_400HZ:
+//      ptr += chsnprintf(ptr,512,"DATA_RATE=400 SPS\n");
+//      break;
+//    case BMI160_ACCEL_ODR_800HZ:
+//      ptr += chsnprintf(ptr,512,"DATA_RATE=800 SPS\n");
+//      break;
+//    case BMI160_ACCEL_ODR_1600HZ:
+//      ptr += chsnprintf(ptr,512,"DATA_RATE=1600 SPS\n");
+//      break;
+//    }
+//  }  
+  FIL f;
+  FRESULT fres;
+  fres = f_open(&f, runTime.logFile.writeFileName, FA_OPEN_APPEND | FA_WRITE);
+  if(fres == FR_OK){
+    UINT SZ;
+    f_lseek(&f,0);
+    f_write(&f,runTime.buffer,512,&SZ);
+    f_close(&f);
+  }
 }
 
 static int8_t adxl355_cmd_start(ADXLDriver *dev)
@@ -426,14 +608,8 @@ static THD_FUNCTION(procOperation ,p)
   }
 //  chThdExit((msg_t)0);
     chEvtUnregister(&adxl.evsource,&runTime.el_sensor);
-}
-
-static void startTransfer(BaseSequentialStream *stream)
-{
-
-  if(!runTime.opThread){
-    runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO,procOperation,stream);
-  }
+  // turn off led
+  palClearPad(GPIOC,3);
 }
 
 static void stopTransfer(void)
@@ -442,7 +618,119 @@ static void stopTransfer(void)
     chThdTerminate(runTime.opThread);
     chThdWait(runTime.opThread);
     runTime.opThread = NULL;
+    chVTReset(&runTime.vt);
   }
+}
+
+static void startTransfer(BaseSequentialStream *stream)
+{
+  if(!runTime.opThread){
+    if(stream == (BaseSequentialStream*)&SDFS1){
+      valid_log_fileName();
+    }
+
+    chVTSet(&runTime.vt,TIME_MS2I(500),blink_cb,NULL);
+    runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO,procOperation,stream);
+  }
+  else{
+    stopTransfer();
+    if(stream == (BaseSequentialStream*)&SDFS1){
+      writeLogHeader();
+    }
+  }
+}
+
+
+void list_file()
+{
+  BinCommandHeader *header = (BinCommandHeader*)runTime.buffer;
+  header->magic1 = MAGIC1;
+  header->magic2 = MAGIC2;
+  FRESULT res;
+  DIR dir;
+  FILINFO finfo;
+  uint32_t sz;
+  res = f_opendir(&dir, "/");
+  if(res == FR_OK){
+    for(;;){
+      res = f_readdir(&dir,&finfo);
+      if(res != FR_OK || finfo.fname[0] == 0) break;
+      if(finfo.fattrib & AM_ARC){
+        header->type = FILE_OP_OK;
+        header->type = 0xA3;
+        header->pid = 0x11;
+        sz = finfo.fsize;
+        memcpy(&runTime.buffer[8],"/\0",2);
+        memcpy(&runTime.buffer[40],finfo.fname,strlen(finfo.fname));
+        runTime.buffer[40+strlen(finfo.fname)] = 0x0;
+        memcpy(&runTime.buffer[72],(uint8_t*)&sz,4);
+        header->len = 76;
+        header->chksum = checksum(runTime.buffer,header->len);
+        streamWrite((BaseSequentialStream*)&SDW1,runTime.buffer,header->len);
+        chThdSleepMilliseconds(50);
+      }
+    }
+    header->len = CMD_STRUCT_SZ;
+    header->chksum = checksum((uint8_t*)&header,header->len);
+    streamWrite((BaseSequentialStream*)&SDW1,runTime.buffer,header->len);
+    chThdYield();
+  }
+}
+
+void read_file()
+{
+  BinCommandHeader *header = (BinCommandHeader*)runTime.buffer;
+  header->magic1 = MAGIC1;
+  header->magic2 = MAGIC2;
+  FRESULT fres;
+  DIR dir;
+  FIL f;
+  uint32_t offset;
+    UINT readSz = 300;
+  UINT szRead;
+  if(SDFS1.readOffset == 0xFFFFFFFF){ // read all file
+    fres = f_open(&f,SDFS1.fileName, FA_READ);
+    offset = 0;
+    if(fres == FR_OK){
+      header->type = 0xA3;
+      header->pid = 0x13;
+      for(;;){
+        memcpy(&runTime.buffer[8],(uint8_t*)&offset,4);
+        f_read(&f, &runTime.buffer[12],readSz,&szRead);
+        header->len = szRead + CMD_STRUCT_SZ + 4;
+        header->chksum = checksum(runTime.buffer,header->len);
+        streamWrite((BaseSequentialStream *)&SDW1,runTime.buffer,header->len);
+        offset += szRead;
+        chThdSleepMilliseconds(40);
+        if(offset == f.obj.objsize){ // read at the end of file
+          f_close(&f);
+          break;
+        }
+      }
+      // transfer last packet with 0-byte data
+      header->len = CMD_STRUCT_SZ;
+      header->chksum = checksum(runTime.buffer,header->len);
+      streamWrite((BaseSequentialStream *)&SDW1,runTime.buffer,header->len);
+      chThdYield();
+      chThdSleepMilliseconds(200);
+    }
+  }
+  else{
+    fres = f_open(&f,SDFS1.fileName, FA_READ);
+    if(fres == FR_OK){
+      if(offset < f.obj.objsize){
+        readSz = ((f.obj.objsize - offset)>256)?256:(f.obj.objsize - offset + 1);
+        f_lseek(&f,offset);
+        memcpy(&runTime.buffer[8],(uint8_t*)&offset,4);
+        f_read(&f, &runTime.buffer[12],readSz,&szRead);
+        header->len = szRead + CMD_STRUCT_SZ + 4;
+        header->chksum = checksum(runTime.buffer,header->len);
+        streamWrite((BaseSequentialStream *)&SDW1,runTime.buffer,header->len);
+        chThdYield();
+      }
+    }
+    f_close(&f);
+  }                            
 }
 
 static THD_WORKING_AREA(waShell,1024);
@@ -461,7 +749,7 @@ void vnode_app_init()
   
   
   bincmd_shellInit();
-  
+  chVTObjectInit(&runTime.vt);
   
   memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
   if(adxl355_init(&adxl) == ADXL355_OK){
@@ -473,24 +761,53 @@ void vnode_app_init()
 
   // start SD Logger
   fs_init();
-  
+  uint8_t tmp[320];
   chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(0) | EVENT_MASK(1));
+  chEvtRegisterMask(&SDW1.es, &runTime.el_wireless,RSI_APP_EVENT_SPP_CONN | RSI_APP_EVENT_SPP_DISCONN );
+  // enable user button interrupt
+  palSetLineCallback(PAL_LINE(GPIOC,13),user_button_isr,NULL);
+  palEnableLineEvent(PAL_LINE(GPIOC,13),PAL_EVENT_MODE_RISING_EDGE);
+  runTime.self = chThdGetSelfX();
 //  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(1));
   while(1){
-    chEvtWaitAny(ALL_EVENTS);
+    eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_IMMEDIATE);
     eventflags_t flags = chEvtGetAndClearFlags(&runTime.el_sdfs);
-    if(flags & EVENT_MASK(0)){// insert
+    if(flags & EV_SD_INS){// insert
       sdfs_loadCard(&SDFS1);
     }
-    if(flags & EVENT_MASK(1)){// write
+    if(flags & EV_SD_WRITE){// write
       size_t n;
       chSysLock();
       uint8_t *buf = obqGetFullBufferI(&SDFS1.oqueue,&n);
-      memcpy(runTime.buffer,buf,n);
+      memcpy(tmp,buf,n);
       obqReleaseEmptyBufferI(&SDFS1.oqueue);
       chSysUnlock();    
       
-      sdfs_write(&SDFS1, "test.txt", runTime.buffer, n);
+      if(tmp != NULL){
+        if(sdfs_write(&SDFS1, runTime.logFile.writeFileName, runTime.buffer, n)> nvmParam.nodeParam.logFileSize){
+          valid_log_fileName();
+        }
+      }
+    }
+      
+    if(flags & EV_SD_LS){
+      list_file();
+    }
+    
+    if(flags & EV_SD_READ){
+      read_file();
+    }
+    
+    if(evt & EV_USER_BUTTON){
+      startTransfer((BaseSequentialStream*)&SDFS1);
+    }
+
+    flags = chEvtGetAndClearFlags(&runTime.el_wireless);
+    if(flags & RSI_APP_EVENT_SPP_CONN){
+      
+    }
+    if(flags & RSI_APP_EVENT_SPP_DISCONN){
+      stopTransfer();
     }
     chThdSleepMilliseconds(50);
   }
@@ -554,6 +871,7 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
       resp->chksum = checksum(buffer,resp->len);
       // write response
       streamWrite(chp,buffer,resp->len);
+      chThdYield();
     }
   }
   else{ // write config
@@ -600,6 +918,7 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         resp->chksum = checksum(buffer,resp->len);
         // write response
         streamWrite(chp,buffer,resp->len);
+        chThdYield();
         save_settings(0);
       }
       else{
@@ -624,10 +943,12 @@ void cmd_start(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
     header.len = CMD_STRUCT_SZ;
     header.chksum = checksum((uint8_t*)&header,header.len);
     streamWrite(chp,(uint8_t*)&header,8);
+    chThdYield();
     if(hin->pid == 0x01){
       startTransfer(chp);
     }
     else{
+      valid_log_fileName();
       startTransfer((BaseSequentialStream*)&SDFS1);
     }
   }
@@ -640,6 +961,7 @@ void cmd_start(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
     header.len = CMD_STRUCT_SZ;
     header.chksum = checksum((uint8_t*)&header,header.len);
     streamWrite(chp,(uint8_t*)&header,8);
+    chThdYield();
     stopTransfer();
   }
 }
@@ -658,8 +980,60 @@ void cmd_stop(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
   header.len = CMD_STRUCT_SZ;
   header.chksum = checksum((uint8_t*)&header,header.len);
   streamWrite(chp,(uint8_t*)&header,8);
+  chThdYield();
 }
-void cmd_read(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data)
+void cmd_read(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
+{
+  BinCommandHeader header;
+  header.magic1 = MAGIC1;
+  header.magic2 = MAGIC2;
+  header.type = MASK_CMD_RET_ERR;
+
+  if(runTime.opThread){
+    header.type = MASK_CMD_RET_OK;
+    stopTransfer();
+  }
+  header.pid = 0;
+  header.len = CMD_STRUCT_SZ;
+  header.chksum = checksum((uint8_t*)&header,header.len);
+  streamWrite(chp,(uint8_t*)&header,8);
+}
+
+void cmd_list_file(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
+{
+//  BinCommandHeader *header = (BinCommandHeader*)runTime.buffer;
+//  header->magic1 = MAGIC1;
+//  header->magic2 = MAGIC2;
+//  header->type = FILE_OP_ERR;
+//  header->pid = hin->pid;
+  
+  sdfsListFile(&SDFS1);
+  
+}
+void cmd_read_file(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
+{
+//  BinCommandHeader *header = (BinCommandHeader*)runTime.buffer;
+//  header->magic1 = MAGIC1;
+//  header->magic2 = MAGIC2;
+//  header->type = 0xA3;
+//  header->pid = hin->pid;
+  //uint8_t buffer[256];
+  char fileName[32];
+  uint32_t offset;
+  UINT readSz = 256;
+  UINT szRead;
+  if(hin->len == 48){ // name[32], offset/size 4/4
+    // read remaining data
+    streamRead(chp,fileName,32);
+    streamRead(chp,(uint8_t*)&offset,4);
+    streamRead(chp,(uint8_t*)&szRead,4);
+    memcpy(SDFS1.fileName,fileName,32);
+    SDFS1.readOffset = offset;
+    sdReadFile(&SDFS1);
+    
+  }
+}
+void cmd_write_file(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
 {
   
 }
