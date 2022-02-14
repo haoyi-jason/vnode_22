@@ -44,6 +44,7 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x00,0,0},cmd_config}, // node param
   {{0xab,0xba,0xA2,0x01,0,0},cmd_config}, // adxl param
   {{0xab,0xba,0xA2,0x40,0,0},cmd_config}, // module param
+  {{0xab,0xba,0xA2,0x4F,0,0},cmd_config}, // user param
   {{0xab,0xba,0xA1,0x01,0,0},cmd_start}, // start
   {{0xab,0xba,0xA1,0x02,0,0},cmd_start}, // start log to sd
   {{0xab,0xba,0xA1,0x00,0,0},cmd_stop}, // stop
@@ -87,6 +88,7 @@ struct _runTime{
     uint16_t read_count;
   }logFile;
   virtual_timer_t vt;
+  BaseSequentialStream *activeStream;
 };
 
 static struct _runTime runTime, *app_runTime;
@@ -124,7 +126,7 @@ const module_setting_t module_default = {
   "VSS",
   0x12345678, 
   0x00000001,
-  "Grididea-AT32",
+  "Grididea-ST32",
   "VSS-II" // supported config
 };
 
@@ -175,12 +177,7 @@ static void load_settings()
 
 static void save_settings(uint8_t option)
 {
-  //chSysLock();
-//  chSysDisable();
-    //nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,sizeof(nvmParam));
-    eepromWrite(OFFSET_NVM_CONFIG,sizeof(nvmParam),(uint8_t*)&nvmParam);
-    //chSysUnlock();
-  //  chSysEnable();
+  eepromWrite(OFFSET_NVM_CONFIG,sizeof(nvmParam),(uint8_t*)&nvmParam);
 }
 static void writeLogHeader()
 {
@@ -219,8 +216,8 @@ static void valid_log_fileName()
   struct tm now;
   rtcGetTime(&RTCD1,&timespec);
   rtcConvertDateTimeToStructTm(&timespec,&now,NULL);
-
-  chsnprintf(runTime.logFile.writeFileName,64,"%s_%04d%02d%02d-%02d%02d%02d.bin\0",
+  char fileName[64];
+  chsnprintf(fileName,64,"%s_%04d%02d%02d-%02d%02d%02d.bin\0",
              nvmParam.nodeParam.log_file_prefix,
              now.tm_year+1900,
              now.tm_mon+1,
@@ -229,15 +226,19 @@ static void valid_log_fileName()
              now.tm_min,
              now.tm_sec);
   
-  FRESULT fres;
-  FIL f;
-  fres = f_open(&f,runTime.logFile.writeFileName,FA_READ | FA_WRITE | FA_CREATE_NEW);
-  if(fres != FR_OK){
-    while(1);
+  if(strncmp(fileName, runTime.logFile.writeFileName, strlen(fileName)) != 0){
+    FRESULT fres;
+    FIL f;
+    memcpy(runTime.logFile.writeFileName,fileName, strlen(fileName));
+    fres = f_open(&f,runTime.logFile.writeFileName,FA_READ | FA_WRITE | FA_CREATE_NEW);
+    if(fres != FR_OK){
+      while(1);
+    }
+    
+    fres = f_lseek(&f,512);
+    f_close(&f);
   }
   
-  fres = f_lseek(&f,512);
-  f_close(&f);
 }
 
 static void finish_log_file()
@@ -619,12 +620,16 @@ static void stopTransfer(void)
     chThdWait(runTime.opThread);
     runTime.opThread = NULL;
     chVTReset(&runTime.vt);
+    if(runTime.activeStream == (BaseSequentialStream*)&SDFS1){
+      writeLogHeader();
+    }
   }
 }
 
 static void startTransfer(BaseSequentialStream *stream)
 {
   if(!runTime.opThread){
+    runTime.activeStream = stream;
     if(stream == (BaseSequentialStream*)&SDFS1){
       valid_log_fileName();
     }
@@ -634,9 +639,6 @@ static void startTransfer(BaseSequentialStream *stream)
   }
   else{
     stopTransfer();
-    if(stream == (BaseSequentialStream*)&SDFS1){
-      writeLogHeader();
-    }
   }
 }
 
@@ -686,7 +688,7 @@ void read_file()
   DIR dir;
   FIL f;
   uint32_t offset;
-    UINT readSz = 300;
+  UINT readSz = 300;
   UINT szRead;
   if(SDFS1.readOffset == 0xFFFFFFFF){ // read all file
     fres = f_open(&f,SDFS1.fileName, FA_READ);
@@ -701,7 +703,7 @@ void read_file()
         header->chksum = checksum(runTime.buffer,header->len);
         streamWrite((BaseSequentialStream *)&SDW1,runTime.buffer,header->len);
         offset += szRead;
-        chThdSleepMilliseconds(40);
+        chThdSleepMilliseconds(25);
         if(offset == f.obj.objsize){ // read at the end of file
           f_close(&f);
           break;
@@ -816,9 +818,9 @@ void vnode_app_init()
 void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
 {
   BinCommandHeader *header = (BinCommandHeader*)data;
-  uint8_t buffer[256];
+  uint8_t buffer[270];
   BinCommandHeader *resp = (BinCommandHeader*)buffer;
-  memcpy(buffer,data,4);
+  memcpy(buffer,data,CMD_STRUCT_SZ);
   if(header->len == CMD_STRUCT_SZ){ // read config
     // crc check
     uint16_t crc = checksum(data,CMD_STRUCT_SZ);
@@ -855,6 +857,9 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
       case 0x43: // WLAN
         break;
       case 0x4F: // USER PARAM
+        eepromRead(OFFSET_NVM_USER,256,&buffer[8]);
+        resp->len = 264;
+        valid = 1;
         break;
       }
       if(valid){
@@ -898,7 +903,9 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         break;
       case 0x5: // OLED
         break;
-      case 0x40: // MODULE
+      case 0xC0: // MODULE Write use 0xC0
+        // check for key to enable write module param
+        // module param only avaliable for private use
         memcpy((uint8_t*)&nvmParam.moduleParam,&buffer[8], sizeof(nvmParam.moduleParam));
         valid = true;
         break;
@@ -909,6 +916,7 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
       case 0x43: // WLAN
         break;
       case 0x4F: // USER PARAM
+        eepromWrite(OFFSET_NVM_USER,header->len - CMD_STRUCT_SZ,&buffer[8]);
         break;
       }
       if(valid){

@@ -3,7 +3,7 @@
 #include "bootConfig.h"
 
 //uint16_t pageBuffer(PAGE_SIZE/2);
-#define FLASH_ErasePage FLASH_EraseSector
+//#define FLASH_ErasePage FLASH_EraseSector
 
 static uint16_t FLASH_ReadHalfWord(uint32_t ReadAddress)
 {

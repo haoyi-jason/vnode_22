@@ -99,7 +99,7 @@
 /*=======================================================================*/
 
 #define RSI_BT_MAX_PAYLOAD_SIZE              320 /* Max supported is 200, but 190 gives optimum Tx throughput */
-//#define RSI_BT_MAX_PAYLOAD_SIZE              200 /* Max supported is 200, but 190 gives optimum Tx throughput */
+//#define RSI_BT_MAX_PAYLOAD_SIZE              600 /* Max supported is 200, but 190 gives optimum Tx throughput */
 #define BT_BDR_MODE                           0 // 1 - HP chain
 
 #endif

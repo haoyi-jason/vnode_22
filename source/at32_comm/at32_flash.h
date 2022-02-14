@@ -2,9 +2,15 @@
 #define _AT32_FLASH_
 
 #include "hal.h"
-//#include "at32f4xx.h"
+#ifdef AT32F4XX
+#include "at32f4xx.h"
+#endif
+#ifdef STM32F1XX
 //#include "stm32f1xx.h"
+#endif
+#ifdef STM32F411xE
 #include "stm32f4xx.h"
+#endif
 /*
 #if defined(AT32F413Rx_HD)
 #define PAGE_SIZE (uint16_t)0x800 // 2k page size

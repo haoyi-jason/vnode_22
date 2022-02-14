@@ -86,7 +86,7 @@ int main()
 //  chThdCreateStatic(waBlink, sizeof(waBlink), NORMALPRIO, procBlink, NULL);
 // shellInit();
   
-  //vnode_app_init();
+  vnode_app_init();
 //  while(1){
 //    if (SDU1.config->usbp->state == USB_ACTIVE) {
 //      /* Starting shells.*/

@@ -45,6 +45,19 @@ typedef struct{
   uint8_t intmask;
 }adxl355_cfg_t;
 
+typedef struct{
+  uint16_t sampleNumber;
+  uint16_t samplePeriodMs;
+}time_domain_param_t;
+
+typedef struct{
+  uint8_t sla;
+  uint8_t dataBits;
+  uint8_t parity;
+  uint8_t stopBits;
+  uint32_t baudrate;
+}mbRTUOpts_t;
+
 
 
 #endif

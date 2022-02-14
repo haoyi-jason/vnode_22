@@ -6,6 +6,7 @@
 #include "bincmd_shell.h"
 #include "nvm_config.h"
 #include "usbcfg.h"
+#include "bootConfig.h"
 
 static struct{
   uint8_t flag;
@@ -23,6 +24,8 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *da
 void cmd_start(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_stop(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_read(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
+void cmd_boot(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
+void cmd_idn(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 
 BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x00,0,0},cmd_config}, // node param
@@ -31,6 +34,8 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA1,0x01,0,0},cmd_start}, // start
   {{0xab,0xba,0xA1,0x00,0,0},cmd_stop}, // stop
   {{0xab,0xba,0x01,0x00,0,0},cmd_read},
+  {{0xab,0xba,0xAF,0x00,0,0},cmd_boot},
+  {{0xab,0xba,0xA4,0x00,0,0},cmd_idn},
   {{0xab,0xba,0x01,0x00,0,0},NULL},
 };
 
@@ -57,6 +62,9 @@ struct {
   uint8_t activatedSensor;
   uint8_t sensorReady;
   thread_t *shelltp;
+  virtual_timer_t vt;
+  uint32_t timeout;
+  thread_t *monitorThread;
 }runTime;
 
 static SPIConfig spicfg = {
@@ -89,7 +97,7 @@ static ADXLDriver adxl = {
 
 const module_setting_t module_default = {
   0xBB,
-  "VSS",
+  "VNODE",
   0x12345678, 
   0x00000001,
   "Grididea-AT32",
@@ -260,6 +268,7 @@ static THD_FUNCTION(procOperation ,p)
                 header->chksum = checksum(runTime.buffer,header->len);
                 if(stream != NULL){
                   streamWrite(stream,runTime.buffer, header->len);
+                  runTime.timeout = 0;
                 }
                 runTime.rxSz = CMD_STRUCT_SZ + 4;
               }
@@ -421,12 +430,15 @@ static THD_FUNCTION(procOperation ,p)
 //  chThdExit((msg_t)0);
     chEvtUnregister(&adxl.evsource,&runTime.el_sensor);
 }
+static void keep_live(void *arg);
 
 static void startTransfer(void)
 {
 
   if(!runTime.opThread){
     runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO-1,procOperation,&SDU1);
+    //chVTSet(&runTime.vt,TIME_MS2I(200),keep_live,NULL);
+    runTime.timeout = 0;
   }
 }
 
@@ -436,9 +448,32 @@ static void stopTransfer(void)
     chThdTerminate(runTime.opThread);
     chThdWait(runTime.opThread);
     runTime.opThread = NULL;
+    chVTReset(&runTime.vt);
   }
 }
 
+static void keep_live(void *arg)
+{
+  chSysLockFromISR();
+  chVTSetI(&runTime.vt, TIME_MS2I(200),keep_live,NULL);
+  runTime.timeout++;
+  chSysUnlockFromISR();
+}
+static THD_WORKING_AREA(waMonitor,512);
+static THD_FUNCTION(procMonitor ,p)
+{
+  while(1){
+    if(runTime.opThread != NULL){
+      runTime.timeout ++;
+      if(runTime.timeout > 10){
+        stopTransfer();
+      }
+    }
+    
+    chThdSleepMilliseconds(200);
+  }
+  
+}
 //static THD_WORKING_AREA(waShell,2048);
 #define SHELL_WA_SIZE   1024
 void vnode_app_init()
@@ -452,6 +487,18 @@ void vnode_app_init()
     adxl355_powerdown(&adxl);
   }
   //runTime.shelltp = chThdCreateStatic(waShell, sizeof(waShell),NORMALPRIO+1,binshellProc,(void*)&shell_cfg);
+  sduObjectInit(&SDU1);
+  sduStart(&SDU1, &serusbcfg);
+  usbDisconnectBus(serusbcfg.usbp);
+//  palClearPad(GPIOA,15);
+//  chThdSleepMilliseconds(1000);
+//  palSetPad(GPIOA,15);
+  usbStart(serusbcfg.usbp, &usbcfg);
+  usbConnectBus(serusbcfg.usbp);  
+  
+//  chVTObjectInit(&runTime.vt);
+  runTime.monitorThread = chThdCreateStatic(waMonitor,sizeof(waMonitor),NORMALPRIO-1,procMonitor,NULL);
+  
 
   while(1){
     if (SDU1.config->usbp->state == USB_ACTIVE) {
@@ -473,6 +520,13 @@ void vnode_app_init()
       chThdSleepMilliseconds(50);
     }
   }
+}
+
+int main()
+{
+  halInit();
+  chSysInit();
+  vnode_app_init();
 }
 
 void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
@@ -636,6 +690,67 @@ void cmd_read(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data
   
 }
 
+void cmd_boot(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
+{
+  if(runTime.opThread != NULL) return;
+  
+  BinCommandHeader *header = (BinCommandHeader*)data;
+  uint8_t buffer[96];
+  BinCommandHeader *resp = (BinCommandHeader*)buffer;
+  memcpy(buffer,header,8);
+  // read remaining data
+  if(header->len == (CMD_STRUCT_SZ + 4)){
+    boot_info bootInfo;
+    bootInfo.loaderVersion = 0x0;
+    streamRead(chp,&buffer[CMD_STRUCT_SZ],header->len - CMD_STRUCT_SZ);
+    uint16_t crc = checksum(buffer,header->len);
+    resp->len = CMD_STRUCT_SZ;
+    if(crc == header->chksum){
+      flash_Read(BL_CONFIG_ADDRESS,(uint16_t*)&bootInfo, sizeof(bootInfo)/2);
+      memcpy((uint8_t*)&bootInfo.bootOption,&buffer[CMD_STRUCT_SZ],4);
+//      bootInfo.bootOption = BOOT_KEY;
+      flash_Write(BL_CONFIG_ADDRESS,(uint16_t*)&bootInfo, sizeof(bootInfo)/2);
+      resp->type = MASK_CMD_RET_OK;
+    }
+    else{
+      resp->type = MASK_CMD_RET_ERR;
+    }
+    resp->pid = 0;
+    resp->chksum = checksum(buffer,resp->len);
+    chSysDisable();
+    NVIC_SystemReset();
+  }
+
+}
+
+void cmd_idn(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data)
+{
+  uint8_t buffer[96];
+  BinCommandHeader *hin = (BinCommandHeader*)data;
+  BinCommandHeader *resp = (BinCommandHeader*)buffer;
+  memcpy(buffer, (uint8_t*)header,8);
+
+  if(header->len == CMD_STRUCT_SZ){
+    boot_info bootInfo;
+    bootInfo.loaderVersion = 0x0;
+    uint16_t crc = checksum(buffer,header->len);
+    //resp->len = CMD_STRUCT_SZ + sizeof(bootInfo);
+    if(crc == header->chksum){
+      resp->len = CMD_STRUCT_SZ + sizeof(bootInfo);
+      flash_Read(BL_CONFIG_ADDRESS,(uint16_t*)&bootInfo, sizeof(bootInfo)/2);
+      memcpy(&buffer[CMD_STRUCT_SZ], (uint8_t*)&bootInfo.bootOption,sizeof(bootInfo));
+      resp->type = MASK_CMD_RET_OK;
+    }
+    else{
+      resp->len = CMD_STRUCT_SZ;
+      resp->type = MASK_CMD_RET_ERR;
+    }
+    resp->pid = 0;
+    resp->chksum = checksum(buffer,resp->len);
+    // write response
+    streamWrite(chp,buffer,resp->len);
+  }  
+}
 
 
 
