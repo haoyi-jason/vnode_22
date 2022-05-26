@@ -24,6 +24,8 @@
 #define FLASH_BASE_ADDRESS      ((uint32_t)0x8000000)
 #define FLASH_ALL_SIZE          (1024*64) // 64K
 #define USER_FLASH_BASE_PAGE    32
+#else
+#error "No valid process family selected"
 #endif
 
 #define PAGE_NUMBER(x) (x/PAGE_SIZE)

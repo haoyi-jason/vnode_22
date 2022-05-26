@@ -4,7 +4,7 @@
 #define GLOBAL_BUFF_LEN 8000
 #define RSI_APP_BUF_SIZE 600
 #define RSI_BT_TASK_STACK_SIZE 1024
-#define RSI_BT_TASK_PRIORITY   NORMALPRIO+1
+#define RSI_BT_TASK_PRIORITY   NORMALPRIO
 #define WLAN_AP         0x0
 #define WLAN_STA        0x10
 
@@ -413,5 +413,13 @@ void sdwInit(void);
 void sdwObjectInit(SerialWLANDriver *sdwp);
 void sdwStart(SerialWLANDriver *sdwp, const SerialWLANConfig *config);
 void sdwStop(void);
+void set_wlan_config(uint8_t *d, uint16_t sz);
+uint16_t get_wlan_config(uint8_t *d, uint16_t sz);
+
+void wireless_read_lan_param(uint8_t *d, uint16_t *szRead, uint16_t maxSz);
+void wireless_write_lan_param(uint8_t *d, uint16_t szWrite);
+void wireless_read_wlan_param(uint8_t *d, uint16_t *szRead, uint16_t maxSz);
+void wireless_write_wlan_param(uint8_t *d, uint16_t szWrite);
+void wireless_param_load_default();
 
 #endif

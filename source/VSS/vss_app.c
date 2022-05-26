@@ -9,6 +9,27 @@
 #include "ylib/eeprom/at24_eep.h"
 #include "task_wireless.h"
 #include "task_storage.h"
+#include "ylib/sensor/htud/htu2x.h"
+
+
+#define ADC_GRP1_NUM_CHANNELS   3
+#define ADC_GRP1_BUF_DEPTH      8
+static const ADCConversionGroup adcgrpcfg = {
+  TRUE,
+  ADC_GRP1_NUM_CHANNELS,
+  NULL,
+  NULL,
+  0,    //cr1
+  ADC_CR2_SWSTART, //cr2
+  ADC_SMPR1_SMP_AN10(ADC_SAMPLE_480) | ADC_SMPR1_SMP_AN11(ADC_SAMPLE_480)| ADC_SMPR1_SMP_AN12(ADC_SAMPLE_480),// SMPR1
+  0,
+  ADC_SQR1_NUM_CH(ADC_GRP1_NUM_CHANNELS), // HTR
+  0,    // LTR
+  0,    // SQR1
+  0,    // SQR2
+  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN10) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN11) | ADC_SQR3_SQ3_N(ADC_CHANNEL_IN12), // SQR3  
+};
+
 
 #define NVM_FLAG        0xAC
 struct _nvmParam{
@@ -44,7 +65,9 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x00,0,0},cmd_config}, // node param
   {{0xab,0xba,0xA2,0x01,0,0},cmd_config}, // adxl param
   {{0xab,0xba,0xA2,0x40,0,0},cmd_config}, // module param
+  {{0xab,0xba,0xA2,0x43,0,0},cmd_config}, // wlan param
   {{0xab,0xba,0xA2,0x4F,0,0},cmd_config}, // user param
+  {{0xab,0xba,0xA2,0x0E,0,0},cmd_config}, // RTC
   {{0xab,0xba,0xA1,0x01,0,0},cmd_start}, // start
   {{0xab,0xba,0xA1,0x02,0,0},cmd_start}, // start log to sd
   {{0xab,0xba,0xA1,0x00,0,0},cmd_stop}, // stop
@@ -66,7 +89,8 @@ struct _runTime{
   uint8_t *rxPtr;
   uint8_t *txPtr;
   uint8_t *bufEnd;
-  uint8_t buffer[600];
+  uint8_t buffer[512];
+  //uint8_t tmp[512];
   mutex_t mutex;
   uint16_t rxSz;
   event_source_t es_sensor;
@@ -89,6 +113,12 @@ struct _runTime{
   }logFile;
   virtual_timer_t vt;
   BaseSequentialStream *activeStream;
+  adcsample_t samples[ADC_GRP1_NUM_CHANNELS*ADC_GRP1_BUF_DEPTH];
+  int16_t battery_mv[2];
+  uint8_t activeWlan;
+  uint16_t blinkPeriod;
+  systime_t elapsed;
+  systime_t last;
 };
 
 static struct _runTime runTime, *app_runTime;
@@ -98,7 +128,7 @@ static SPIConfig spicfg = {
   NULL,
   NULL,
   0,
-  SPI_CR1_BR_2
+  SPI_CR1_BR_1
 };
 
 _adxl_interface_t adxlInterface = {
@@ -130,11 +160,38 @@ const module_setting_t module_default = {
   "VSS-II" // supported config
 };
 
+/*
+battery monitor was divide by 2 resistor, the vref = 2.72V, 12-bit ADC
+
+*/
+
+static void update_adc()
+{
+  int16_t chSum[3] = {0,0,0};
+  for(uint8_t i=0;i<ADC_GRP1_BUF_DEPTH;i++){
+    chSum[0] += runTime.samples[i * 3];
+    chSum[1] += runTime.samples[i * 3 +1];
+    chSum[2] += runTime.samples[i * 3 +2];
+  }
+  chSum[0] >>= 3;
+  chSum[1] >>=3;
+  chSum[2] >>=3;
+  
+  float ratio = (float)chSum[0]/4096.F;
+  runTime.battery_mv[0] = ratio *5440;
+  
+  ratio = (float)chSum[1]/4096.F;
+  runTime.battery_mv[1] = ratio *5440;
+
+  runTime.buffer[CMD_STRUCT_SZ+4] = (uint8_t)((runTime.battery_mv[0] - 2500)/10);
+  runTime.buffer[CMD_STRUCT_SZ+5] = (uint8_t)((runTime.battery_mv[1] - 2500)/10);
+}
+
 static void blink_cb(void *arg)
 {
   chSysLockFromISR();
   palTogglePad(GPIOC,3);
-  chVTSetI(&runTime.vt, TIME_MS2I(500),blink_cb,NULL);
+  chVTSetI(&runTime.vt, TIME_MS2I(runTime.blinkPeriod),blink_cb,NULL);
   chSysUnlockFromISR();
 }
 
@@ -145,16 +202,9 @@ static void user_button_isr(void *arg)
   chSysUnlockFromISR();
 }
 
-static void load_settings()
+static void load_default()
 {
   uint16_t nvmSz = sizeof(nvmParam);
-  if(nvmSz > SZ_NVM_CONFIG){
-    // error
-    while(1);
-  }
-//  nvm_flash_read(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
-  eepromRead(OFFSET_NVM_CONFIG,nvmSz,(uint8_t*)&nvmParam);
-  if(nvmParam.flag != NVM_FLAG){
     nvmParam.flag = NVM_FLAG;
     nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
     nvmParam.nodeParam.commType = COM_IF_BT;
@@ -167,10 +217,21 @@ static void load_settings()
     nvmParam.adxlParam.hpf = 0;
     
     memcpy((uint8_t*)&nvmParam.moduleParam,(uint8_t*)&module_default, sizeof(module_setting_t));
-    
-    
     //nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
     eepromWrite(OFFSET_NVM_CONFIG,nvmSz,(uint8_t*)&nvmParam);
+}
+
+static void load_settings()
+{
+  uint16_t nvmSz = sizeof(nvmParam);
+  if(nvmSz > SZ_NVM_CONFIG){
+    // error
+    while(1);
+  }
+//  nvm_flash_read(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
+  eepromRead(OFFSET_NVM_CONFIG,nvmSz,(uint8_t*)&nvmParam);
+  if(nvmParam.flag != NVM_FLAG){
+    load_default();  
   }
   
 }
@@ -421,6 +482,7 @@ static THD_FUNCTION(procOperation ,p)
   uint32_t fifo_size;
   eventmask_t evt;
   runTime.rxSz = CMD_STRUCT_SZ + 4;
+  uint8_t packetIgnore = 2;
   while(!bStop){
     evt = chEvtWaitAny(ALL_EVENTS);
    // flags = chEvtGetAndClearFlags(&elSensor);
@@ -436,21 +498,32 @@ static THD_FUNCTION(procOperation ,p)
         switch(opMode){
         case OP_STREAM:
           bsz = sz*9; // read x/y/z combo
+          if(bsz < 144)
+            while(1);
           if(bsz >= 144){
-            adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],144); // each record has 9-bytes (x/y/z)*3
-            runTime.rxSz += 144;
+            adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],bsz); // each record has 9-bytes (x/y/z)*3
+            runTime.rxSz += bsz;
             if(runTime.rxSz > 270){                
                 header = (BinCommandHeader*)runTime.buffer;
                 header->magic1 = MAGIC1;
                 header->magic2 = MAGIC2;
                 header->type = MASK_DATA ;//| runTime.lbt;
-                header->len = 288 + CMD_STRUCT_SZ + 4;
+                header->len = 288 + CMD_STRUCT_SZ + 6;
                 header->pid = pktCount++;
                 header->chksum = checksum(runTime.buffer,header->len);
-                if(stream != NULL){
-                  streamWrite(stream,runTime.buffer, header->len);
+                if(stream != NULL && packetIgnore==0){
+                  if(stream == (BaseSequentialStream*)&SDFS1){
+                    sdfs_insertData((FSDriver*)stream,runTime.buffer, header->len);
+                  }
+                  else if(stream == (BaseSequentialStream*)&SDW1){
+                    //chSysLock();
+                    streamWrite(stream,runTime.buffer, header->len);
+                    //chSysUnlock();
+                  }
                 }
-                runTime.rxSz = CMD_STRUCT_SZ + 4;
+                runTime.rxSz = CMD_STRUCT_SZ + 6;
+                if(packetIgnore > 0)
+                  packetIgnore--;
               }
           }
           break;
@@ -619,8 +692,20 @@ static void stopTransfer(void)
     chThdTerminate(runTime.opThread);
     chThdWait(runTime.opThread);
     runTime.opThread = NULL;
-    chVTReset(&runTime.vt);
+    if(runTime.activeWlan == 0){
+      chVTReset(&runTime.vt);
+      palSetPad(GPIOC,3);
+    }
+    else{
+      runTime.blinkPeriod = 1000;
+    }
     if(runTime.activeStream == (BaseSequentialStream*)&SDFS1){
+//      size_t bsz = SDFS1.iqueue.q_counter;
+//      if(bsz >= 0) {
+//        size_t n;
+//        n = streamRead(&SDFS1,runTime.tmp,512);
+//        sdfs_write(&SDFS1, runTime.logFile.writeFileName, runTime.tmp, n);
+//      }      
       writeLogHeader();
     }
   }
@@ -633,8 +718,8 @@ static void startTransfer(BaseSequentialStream *stream)
     if(stream == (BaseSequentialStream*)&SDFS1){
       valid_log_fileName();
     }
-
-    chVTSet(&runTime.vt,TIME_MS2I(500),blink_cb,NULL);
+    runTime.blinkPeriod = 500;
+    chVTSet(&runTime.vt,TIME_MS2I(runTime.blinkPeriod),blink_cb,NULL);
     runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO,procOperation,stream);
   }
   else{
@@ -720,8 +805,9 @@ void read_file()
   else{
     fres = f_open(&f,SDFS1.fileName, FA_READ);
     if(fres == FR_OK){
+      offset = SDFS1.readOffset;
       if(offset < f.obj.objsize){
-        readSz = ((f.obj.objsize - offset)>256)?256:(f.obj.objsize - offset + 1);
+        readSz = ((f.obj.objsize - offset)>300)?300:(f.obj.objsize - offset + 1);
         f_lseek(&f,offset);
         memcpy(&runTime.buffer[8],(uint8_t*)&offset,4);
         f_read(&f, &runTime.buffer[12],readSz,&szRead);
@@ -735,6 +821,26 @@ void read_file()
   }                            
 }
 
+static const I2CConfig i2ccfg = {
+  OPMODE_I2C,
+  100000,
+  STD_DUTY_CYCLE,
+};
+
+#define PCA9548_BASE_ADDR       0x70
+void pca_set_channel(uint8_t ch)
+{
+  msg_t ret;
+  i2cAcquireBus(&I2CD1);
+  i2cStart(&I2CD1,&i2ccfg);
+  uint8_t ucTx = (1 << ch);
+  uint8_t adr = 0;
+  ret = i2cMasterTransmitTimeout(&I2CD1,PCA9548_BASE_ADDR + adr,&ucTx,1,NULL,0,TIME_MS2I(10));  
+  i2cStop(&I2CD1);
+  i2cReleaseBus(&I2CD1);
+}
+
+
 static THD_WORKING_AREA(waShell,1024);
 #define SHELL_WA_SIZE   1024
 void vnode_app_init()
@@ -743,6 +849,17 @@ void vnode_app_init()
   app_runTime = &runTime;
   at24eep_init(&I2CD1,32,1024,0x50,2);
   load_settings();
+  
+  uint8_t cc = 0;
+  // check if user press button
+  while(palReadPad(GPIOC,13) == PAL_LOW){
+    cc++;
+    if(cc > 10){
+      load_default();
+      break;
+    }
+    chThdSleepMilliseconds(100);
+  }
   
   // start wireless
   task_wireless_init(nvmParam.nodeParam.commType);
@@ -763,14 +880,22 @@ void vnode_app_init()
 
   // start SD Logger
   fs_init();
-  uint8_t tmp[320];
-  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(0) | EVENT_MASK(1));
+  //uint8_t tmp[320];
+  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EV_SD_INS | EV_SD_WRITE);
   chEvtRegisterMask(&SDW1.es, &runTime.el_wireless,RSI_APP_EVENT_SPP_CONN | RSI_APP_EVENT_SPP_DISCONN );
   // enable user button interrupt
   palSetLineCallback(PAL_LINE(GPIOC,13),user_button_isr,NULL);
   palEnableLineEvent(PAL_LINE(GPIOC,13),PAL_EVENT_MODE_RISING_EDGE);
   runTime.self = chThdGetSelfX();
 //  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(1));
+  
+  // start ADC for battery voltage measurment
+  adcStart(&ADCD1,NULL);
+  adcStartConversion(&ADCD1,&adcgrpcfg,runTime.samples,ADC_GRP1_BUF_DEPTH);
+  htu2xinit(&I2CD1,(I2CConfig*)&i2ccfg);
+  static uint16_t cntr = 20;
+  runTime.activeWlan = 0;
+  uint16_t htu_data[2];
   while(1){
     eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_IMMEDIATE);
     eventflags_t flags = chEvtGetAndClearFlags(&runTime.el_sdfs);
@@ -778,20 +903,27 @@ void vnode_app_init()
       sdfs_loadCard(&SDFS1);
     }
     if(flags & EV_SD_WRITE){// write
-      size_t n;
-      chSysLock();
-      uint8_t *buf = obqGetFullBufferI(&SDFS1.oqueue,&n);
-      memcpy(tmp,buf,n);
-      obqReleaseEmptyBufferI(&SDFS1.oqueue);
-      chSysUnlock();    
-      
-      if(tmp != NULL){
-        if(sdfs_write(&SDFS1, runTime.logFile.writeFileName, runTime.buffer, n)> nvmParam.nodeParam.logFileSize){
+//      size_t n;
+//      n = streamRead(&SDFS1,runTime.tmp,512);
+//      if(sdfs_write(&SDFS1, runTime.logFile.writeFileName, runTime.tmp, n)> nvmParam.nodeParam.logFileSize){
+//        writeLogHeader();
+//        valid_log_fileName();
+//      }
+    }
+    
+    if(runTime.opThread != NULL){
+//      size_t bsz = SDFS1.iqueue.q_counter;
+//      if(bsz >= 512) {
+//        size_t n;
+//        n = streamRead(&SDFS1,runTime.tmp,512);
+        if(sdfs_write(&SDFS1, runTime.logFile.writeFileName, 0, 0)> nvmParam.nodeParam.logFileSize){
+          writeLogHeader();
           valid_log_fileName();
         }
-      }
+//      }
     }
-      
+
+    
     if(flags & EV_SD_LS){
       list_file();
     }
@@ -806,12 +938,30 @@ void vnode_app_init()
 
     flags = chEvtGetAndClearFlags(&runTime.el_wireless);
     if(flags & RSI_APP_EVENT_SPP_CONN){
-      
+      runTime.activeWlan = 1;
+      runTime.blinkPeriod = 1000;
+      chVTSet(&runTime.vt,TIME_MS2I(runTime.blinkPeriod),blink_cb,NULL);
     }
     if(flags & RSI_APP_EVENT_SPP_DISCONN){
+      runTime.activeWlan = 0;
       stopTransfer();
     }
-    chThdSleepMilliseconds(50);
+    cntr--;
+    if(cntr == 0){
+      cntr = 100;
+    }
+    else if(cntr == 90){
+      update_adc();
+    }
+    else if(cntr == 80){
+      pca_set_channel(2);
+      htu_data[0] = sen_htu2xx_read_temp_raw();
+    }
+    else if(cntr == 70){
+      htu_data[1] = sen_htu2xx_read_humidity_raw();  
+      memcpy(&runTime.buffer[CMD_STRUCT_SZ], (uint8_t*)&htu_data[0],4);
+    }
+    chThdSleepMilliseconds(10);
   }
 }
 
@@ -853,13 +1003,34 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
       case 0x41: // SERIAL
         break;
       case 0x42: // LAN
+        wireless_read_lan_param(&buffer[8],&resp->len,256);
+        valid = true;
         break;
       case 0x43: // WLAN
+        wireless_read_wlan_param(&buffer[8],&resp->len,256);
+        valid = true;
         break;
       case 0x4F: // USER PARAM
         eepromRead(OFFSET_NVM_USER,256,&buffer[8]);
         resp->len = 264;
         valid = 1;
+        break;
+      case 0x0E: // read RTC
+        {
+          RTCDateTime timespec;
+          rtc_config_t *rtc_config = (rtc_config_t*)&buffer[CMD_STRUCT_SZ];
+          struct tm tm;
+          rtcGetTime(&RTCD1,&timespec);
+          rtcConvertDateTimeToStructTm(&timespec,&tm,NULL);
+          rtc_config->yy = tm.tm_year;
+          rtc_config->mm = tm.tm_mon + 1;
+          rtc_config->dd = tm.tm_mday;
+          rtc_config->hh = tm.tm_hour;
+          rtc_config->nn = tm.tm_min;
+          rtc_config->ss = tm.tm_sec;
+          resp->len = 6;
+          valid = 1;
+        }
         break;
       }
       if(valid){
@@ -912,11 +1083,31 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
       case 0x41: // SERIAL
         break;
       case 0x42: // LAN
+        wireless_write_lan_param(&buffer[8],header->len - CMD_STRUCT_SZ);
+        valid = true;
         break;
       case 0x43: // WLAN
+        wireless_write_wlan_param(&buffer[8],header->len - CMD_STRUCT_SZ);
+        valid = true;
         break;
       case 0x4F: // USER PARAM
         eepromWrite(OFFSET_NVM_USER,header->len - CMD_STRUCT_SZ,&buffer[8]);
+        break;
+      case 0x0E: // set rtc
+        {
+          rtc_config_t *cfg = (rtc_config_t*)&buffer[8];
+          RTCDateTime timespec;
+          struct tm tim;
+          tim.tm_year = cfg->yy;
+          tim.tm_mon = cfg->mm-1;
+          tim.tm_mday = cfg->dd;
+          tim.tm_hour = cfg->hh;
+          tim.tm_min = cfg->nn;
+          tim.tm_sec = cfg->ss;
+          rtcConvertStructTmToDateTime(&tim,0,&timespec);
+          rtcSetTime(&RTCD1,&timespec);
+          valid = true;          
+        }
         break;
       }
       if(valid){

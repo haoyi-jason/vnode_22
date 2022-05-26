@@ -149,45 +149,57 @@ FSDriver SDFS1;
 
 static size_t _write(void *ip, const uint8_t *bp, size_t n)
 {
-  FSDriver *sdfsp = (FSDriver*)ip;
-  size_t sz = obqWriteTimeout(&((FSDriver*)ip)->oqueue,bp,n,TIME_INFINITE);
-  obqPostFullBuffer(&sdfsp->oqueue, sz);
-  return sz;
+  return 0;
+//  return oqWriteTimeout(&((FSDriver *)ip)->oqueue, bp,
+//                        n, TIME_INFINITE);
+//  FSDriver *sdfsp = (FSDriver*)ip;
+//  uint8_t *ptr = bp;
+//  for(size_t i=0;i<n;i++){
+//    iqPutI(&((FSDriver*)ip)->iqueue,ptr++);
+//  }
+//  return sz;
 }
 
 static size_t _read(void *ip, uint8_t *bp, size_t n)
 {
-  return ibqReadTimeout(&((FSDriver*)ip)->iqueue,bp,n,TIME_INFINITE);
+  return 0;
+//  return iqReadTimeout(&((FSDriver*)ip)->iqueue,bp,n,TIME_INFINITE);
 }
 
 static msg_t _put(void *ip, uint8_t b)
 {
-  return obqPutTimeout(&((FSDriver*)ip)->oqueue,b,TIME_INFINITE);
+  return 0;
+//  return oqPutTimeout(&((FSDriver*)ip)->oqueue,b,TIME_INFINITE);
 }
 
 static msg_t _get(void *ip)
 {
-  return ibqGetTimeout(&((FSDriver*)ip)->iqueue,TIME_INFINITE);
+  return 0;
+//  return iqGetTimeout(&((FSDriver*)ip)->iqueue,TIME_IMMEDIATE);
 }
 
 static msg_t _putt(void *ip, uint8_t b, sysinterval_t timeout)
 {
-  return obqPutTimeout(&((FSDriver*)ip)->oqueue,b,timeout);
+  return 0;
+//  return oqPutTimeout(&((FSDriver*)ip)->oqueue,b, timeout);
 }
 
 static msg_t _gett(void *ip, sysinterval_t timeout)
 {
-  return ibqGetTimeout(&((FSDriver*)ip)->iqueue,timeout);
+  return 0;
+//  return iqGetTimeout(&((FSDriver*)ip)->iqueue,timeout);
 }
 
 static size_t _writet(void *ip, const uint8_t *bp, size_t n,sysinterval_t timeout)
 {
-  return obqWriteTimeout(&((FSDriver*)ip)->oqueue,bp,n,timeout);
+  return 0;
+//  return oqWriteTimeout(&((FSDriver*)ip)->oqueue,bp,n,timeout);
 }
 
 static size_t _readt(void *ip, uint8_t *bp, size_t n,sysinterval_t timeout)
 {
-  return ibqReadTimeout(&((FSDriver*)ip)->iqueue,bp,n,timeout);
+  return 0;
+//  return iqReadTimeout(&((FSDriver*)ip)->iqueue,bp,n,timeout);
 }
 
 static msg_t _ctl(void *ip, unsigned int operation, void *arg)
@@ -203,16 +215,16 @@ static const struct SDFSDriverVMT vmt = {
   _ctl
 };
 
-static void ibnotify(io_buffers_queue_t *bqp)
+static void ibnotify(io_queue_t *bqp)
 {
   
 }
 
-static void obnotify(io_buffers_queue_t *bqp)
+static void obnotify(io_queue_t *bqp)
 {
-  FSDriver *sdfsp = bqGetLinkX(bqp);
+//  FSDriver *sdfsp = bqGetLinkX(bqp);
   //chSysLock();
-  chEvtBroadcastFlagsI(&sdfsp->evs_insertion,EVENT_MASK(1));
+//  chEvtBroadcastFlagsI(&sdfsp->evs_insertion,EVENT_MASK(1));
  // chEvtSignalI(runTime.self,RSI_APP_EVENT_SPP_TX);
  // chSysUnlock();
 }
@@ -243,8 +255,8 @@ void sdfsObjectInit(FSDriver *sdfsp)
 {
   sdfsp->vmt = &vmt;
   osalEventObjectInit(&sdfsp->event);
-  ibqObjectInit(&sdfsp->iqueue, true, sdfsp->ib, SD_BUF_SIZE, 1, ibnotify, sdfsp);
-  obqObjectInit(&sdfsp->oqueue, true, sdfsp->ob, SD_BUF_SIZE, 1, obnotify, sdfsp);
+  //ibqObjectInit(&sdfsp->iqueue, true, sdfsp->ib, SD_BUF_SIZE,NOF_BUFFER, ibnotify, sdfsp);
+  //oqObjectInit(&sdfsp->oqueue, sdfsp->ob, SD_BUF_SIZE, obnotify, sdfsp);
 }
 void sdfsStart(FSDriver *sdfsp, const _SDCConfig *config)
 {
@@ -263,10 +275,26 @@ void sdfsStart(FSDriver *sdfsp, const _SDCConfig *config)
   chEvtObjectInit(&sdfsp->evs_insertion);
   
   sdfs_loadCard(sdfsp);
+  sdfsp->brd = 0;
+  sdfsp->bwr = 0;
 }
 void sdfsStop(void)
 {
   
+}
+
+void sdfs_insertData(FSDriver *dev,const uint8_t *bp, size_t n)
+{
+  FSDriver *sdfsp = (FSDriver*)dev;
+  memcpy(sdfsp->ib[sdfsp->bwr++],bp,n);
+  if(dev->bwr == NOF_BUFFER)
+    dev->bwr = 0;
+//  const uint8_t *ptr = bp;
+//  chSysLock();
+//  for(size_t i=0;i<n;i++){
+//    iqPutI(&((FSDriver*)dev)->iqueue,*ptr++);
+//  }
+//  chSysUnlock();
 }
 
 void sdfs_loadCard(FSDriver *dev)
@@ -290,14 +318,18 @@ void sdfs_loadCard(FSDriver *dev)
 size_t sdfs_write(FSDriver *dev, char *fileName, uint8_t *buff, size_t sz)
 {
   if(!dev->cardReady) return 0;
+  UINT SZ = 0;
   
-  UINT SZ;
-  FIL f;
-  FRESULT res = f_open(&f,fileName,FA_WRITE | FA_OPEN_APPEND);
-  if(res == FR_OK){
-    res = f_write(&f,buff,sz,&SZ);
-    SZ = f.obj.objsize;
-    f_close(&f);
+  if(dev->brd != dev->bwr){
+    FIL f;
+    FRESULT res = f_open(&f,fileName,FA_WRITE | FA_OPEN_APPEND);
+    if(res == FR_OK){
+      res = f_write(&f,dev->ib[dev->brd++],302,&SZ);
+      SZ = f.obj.objsize;
+      f_close(&f);
+      if(dev->brd == NOF_BUFFER)
+        dev->brd = 0;
+    }
   }
   return SZ;
 }

@@ -173,7 +173,7 @@ static void load_settings()
     nvmParam.time.samplePeriodMs = 1000;
     
     nvmParam.mbParam.sla = 0x01;
-    nvmParam.mbParam.baudrate = 96;
+    nvmParam.mbParam.baudrate = 192;
     nvmParam.mbParam.dataBits = 8;
     nvmParam.mbParam.parity = 2; // no parity
     nvmParam.mbParam.stopBits = 0;
@@ -185,7 +185,7 @@ static void load_settings()
     
     nvmParam.imuParam.accel.power = 0;
     nvmParam.imuParam.accel.odr = ISM330DLC_XL_ODR_104Hz;
-    nvmParam.imuParam.accel.range = ISM330DLC_2g;
+    nvmParam.imuParam.accel.range = ISM330DLC_16g;
     nvmParam.imuParam.accel.lpf = 0;
     
     nvmParam.imuParam.gyro.power = 0;
@@ -579,6 +579,7 @@ void vnode_app_init()
   
   
   ntcInit(2.72,(float)nvmParam.ntc_config.shunt_resistance/10.,(float)nvmParam.ntc_config.resistance/10.,nvmParam.ntc_config.beta,nvmParam.ntc_config.beta_temp);
+
   // start ADC
   adcStart(&ADCD1,NULL);
   adcStartConversion(&ADCD1,&adcgrpcfg,samples,ADC_GRP1_BUF_DEPTH);
@@ -793,7 +794,7 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
           break;
         case SENSOR_ISM330:
           if(RANGE_CHECK(iv16,0,3)){
-            nvmParam.adxlParam.fs = iv16;
+            nvmParam.imuParam.accel.range = iv16;
             save = 1;
           }
           break;

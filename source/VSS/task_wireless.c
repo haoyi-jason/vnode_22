@@ -71,27 +71,66 @@ struct _runTime{
   }udp;
 };
 
+struct wlan{
+  uint8_t wlan_mode;
+  char prefix1[16];
+  char passwd1[16];
+  char prefix2[16];
+  char passwd2[16];
+  uint16_t connectTimeout;
+  uint8_t secType;
+  uint8_t pairedInfo[32];
+};
+struct lan{
+  uint8_t ip[4];
+  uint8_t mask[4];
+  uint8_t gateway[4];
+};
+
 struct _nvmParam{
   uint8_t flag;
-  struct{
-    uint8_t wlan_mode;
-    char prefix1[16];
-    char passwd1[16];
-    char prefix2[16];
-    char passwd2[16];
-    uint16_t connectTimeout;
-    uint8_t secType;
-    uint8_t pairedInfo[32];
-  }wlan;
-  struct{
-    uint8_t ip[4];
-    uint8_t mask[4];
-    uint8_t gateway[4];
-  }lan;
+  struct wlan wlan;
+  struct lan lan;
 };
 
 static struct _nvmParam nvmParam,*w_nvmParam=&nvmParam;
 static struct _runTime runTime, *w_runTime = &runTime;
+
+static void save_settings(uint8_t option)
+{
+  eepromWrite(OFFSET_NVM_WIRELESS,sizeof(nvmParam),(uint8_t*)&nvmParam);
+}
+
+
+static void load_default()
+{
+  uint16_t nvmSz = sizeof(nvmParam);
+  nvmParam.flag = NVM_FLAG;
+  nvmParam.wlan.connectTimeout = 10;
+  memcpy(nvmParam.wlan.prefix1,"VSS-III\0",8);
+  memcpy(nvmParam.wlan.prefix2,"Grididea.com.tw\0",16);
+  memcpy(nvmParam.wlan.passwd1,"53290921\0",9);
+  memcpy(nvmParam.wlan.passwd2,"53290921\0",9);
+  nvmParam.wlan.secType = 2;
+  
+  nvmParam.lan.ip[0] = 192;
+  nvmParam.lan.ip[1] = 168;
+  nvmParam.lan.ip[2] = 1;
+  nvmParam.lan.ip[3] = 220;
+  
+  nvmParam.lan.mask[0] = 255;
+  nvmParam.lan.mask[1] = 255;
+  nvmParam.lan.mask[2] = 255;
+  nvmParam.lan.mask[3] = 0;
+
+  nvmParam.lan.gateway[0] = 192;
+  nvmParam.lan.gateway[1] = 168;
+  nvmParam.lan.gateway[2] = 1;
+  nvmParam.lan.gateway[3] = 1;
+  
+  nvmParam.wlan.wlan_mode = WLAN_STA;
+  save_settings(0);
+}
 
 static void load_settings()
 {
@@ -103,38 +142,26 @@ static void load_settings()
 //  nvm_flash_read(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
   eepromRead(OFFSET_NVM_WIRELESS,nvmSz,(uint8_t*)&nvmParam);
   if(nvmParam.flag != NVM_FLAG){
-    nvmParam.flag = NVM_FLAG;
-    nvmParam.wlan.connectTimeout = 10;
-    memcpy(nvmParam.wlan.prefix1,"VSS-III\0",8);
-    memcpy(nvmParam.wlan.prefix2,"Grididea.com.tw\0",16);
-    memcpy(nvmParam.wlan.passwd1,"53290921\0",9);
-    memcpy(nvmParam.wlan.passwd2,"53290921\0",9);
-    nvmParam.wlan.secType = 2;
-    
-    nvmParam.lan.ip[0] = 192;
-    nvmParam.lan.ip[1] = 168;
-    nvmParam.lan.ip[2] = 1;
-    nvmParam.lan.ip[3] = 220;
-    
-    nvmParam.lan.mask[0] = 255;
-    nvmParam.lan.mask[1] = 255;
-    nvmParam.lan.mask[2] = 255;
-    nvmParam.lan.mask[3] = 0;
-
-    nvmParam.lan.gateway[0] = 192;
-    nvmParam.lan.gateway[1] = 168;
-    nvmParam.lan.gateway[2] = 1;
-    nvmParam.lan.gateway[3] = 1;
-    
-    nvmParam.wlan.wlan_mode = WLAN_STA;
-    eepromWrite(OFFSET_NVM_WIRELESS,nvmSz,(uint8_t*)&nvmParam);
+    load_default();
   }
 }
 
-static void save_settings(uint8_t option)
+
+void set_wlan_config(uint8_t *d, uint16_t sz)
 {
-  eepromWrite(OFFSET_NVM_WIRELESS,sizeof(nvmParam),(uint8_t*)&nvmParam);
+    memcpy((uint8_t*)&nvmParam.wlan, d, sizeof(nvmParam.wlan));
+    save_settings(0);
 }
+
+uint16_t get_wlan_config(uint8_t *d, uint16_t sz)
+{
+  uint16_t tsz = sizeof(nvmParam.wlan);
+  if(tsz > sz) return 0;
+  memcpy(d, (uint8_t*)&nvmParam.wlan,tsz);
+  return tsz;
+}
+
+            
 
 
 /*! callback functions */
@@ -1063,7 +1090,7 @@ int32_t task_wireless_init(uint8_t commType)
   //! Task created for Driver task
   start_driver_task();
   //rsi_task_create(rsi_wireless_driver_task, "driver_task",RSI_DRIVER_TASK_STACK_SIZE, NULL, RSI_DRIVER_TASK_PRIORITY, &runTime.rsi_handle.rsi_driver);
-    
+  commType &= 0xF0;  
   if(commType == COMM_USE_WIFI){
     rsi_wlan_init();
   }
@@ -1176,4 +1203,47 @@ void sdwStart(SerialWLANDriver *sdwp, const SerialWLANConfig *config)
 void sdwStop(void)
 {
   
+}
+
+void wireless_read_lan_param(uint8_t *d, uint16_t *szRead, uint16_t maxSz)
+{
+  uint16_t sz = sizeof(nvmParam.lan);
+  *szRead = 0;
+  if(sz < maxSz){
+    memcpy(d,(uint8_t*)&nvmParam.lan,sz);
+    *szRead = sz;
+  }
+}
+
+void wireless_write_lan_param(uint8_t *d, uint16_t szWrite)
+{
+  uint16_t sz = sizeof(nvmParam.lan);
+  if(szWrite <= sz){
+    memcpy((uint8_t*)&nvmParam.lan, d, szWrite);
+    save_settings(0);
+  }
+}
+
+void wireless_read_wlan_param(uint8_t *d, uint16_t *szRead, uint16_t maxSz)
+{
+  uint16_t sz = sizeof(nvmParam.wlan);
+  *szRead = 0;
+  if(sz < maxSz){
+    memcpy(d,(uint8_t*)&nvmParam.wlan,sz);
+    *szRead = sz;
+  }
+}
+
+void wireless_write_wlan_param(uint8_t *d, uint16_t szWrite)
+{
+  uint16_t sz = sizeof(nvmParam.wlan);
+  if(szWrite <= sz){
+    memcpy((uint8_t*)&nvmParam.wlan, d, szWrite);
+    save_settings(0);
+  }
+}
+
+void wireless_param_load_default()
+{
+  load_default();
 }

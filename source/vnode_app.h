@@ -1,6 +1,7 @@
 #ifndef _VNODE_APP_
 #define _VNODE_APP_
 
+#define SENSOR_NONE     0x00
 #define SENSOR_ADXL355  0x01
 #define SENSOR_BMI160   0x02
 #define SENSOR_ISM330   0x04
@@ -58,6 +59,9 @@ typedef struct{
   uint32_t baudrate;
 }mbRTUOpts_t;
 
+typedef struct{
+  uint8_t yy,mm,dd,hh,nn,ss;
+}rtc_config_t;
 
 
 #endif
