@@ -10,9 +10,11 @@
 #include "ylib/sensor/ntc/ntc.h"
 #include "ylib/sensor/ism330dlc/ism330_dev.h"
 
+#include "ylib/sensor/bmi160/bmi160_defs.h"
+#include "ylib/sensor/bmi160/bmi160_dev.h"
 
 
-#define NVM_FLAG        0xAA
+#define NVM_FLAG        0xAC
 
 #define EV_ADXL_FIFO_FULL       EVENT_MASK(0)
 #define EV_IMU_FIFO_FULL        EVENT_MASK(1)
@@ -133,6 +135,23 @@ static ISM330Driver ism330 = {
   &ismConfig
 };
 
+_imu_interface_t bmiInterface = {
+  &SPID1,
+  &spicfg
+};
+static _bmi160_config_t bmiConfig = {
+  {0x0,BMI160_ACCEL_NORMAL_MODE,BMI160_ACCEL_RANGE_2G,0x0},
+  {0x0,BMI160_GYRO_NORMAL_MODE,BMI160_GYRO_RANGE_2000_DPS,0x0},
+  GPIOA,4,
+  GPIOA,2,
+  GPIOA,3
+};
+
+static BMI160Driver bmi160 = {
+  &bmiInterface,
+  &bmiConfig
+};
+
 
 const module_setting_t module_default = {
   NVM_FLAG,
@@ -156,7 +175,7 @@ static void load_settings()
   eepromRead(OFFSET_NVM_CONFIG,nvmSz,(uint8_t*)&nvmParam);
   if(nvmParam.flag != NVM_FLAG){
     nvmParam.flag = NVM_FLAG;
-    nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
+    nvmParam.nodeParam.activeSensor = SENSOR_BMI160;
     nvmParam.nodeParam.commType = COM_IF_SERIAL;
     nvmParam.nodeParam.opMode = OP_VNODE;
     memcpy(nvmParam.nodeParam.log_file_prefix,"SensorNode\0",11);
@@ -183,15 +202,27 @@ static void load_settings()
     nvmParam.ntc_config.beta_temp = 25;
     nvmParam.ntc_config.shunt_resistance = 100; // 0.1K
     
-    nvmParam.imuParam.accel.power = 0;
-    nvmParam.imuParam.accel.odr = ISM330DLC_XL_ODR_104Hz;
-    nvmParam.imuParam.accel.range = ISM330DLC_16g;
+    // config for ISM-330 default
+//    nvmParam.imuParam.accel.power = 0;
+//    nvmParam.imuParam.accel.odr = ISM330DLC_XL_ODR_104Hz;
+//    nvmParam.imuParam.accel.range = ISM330DLC_16g;
+//    nvmParam.imuParam.accel.lpf = 0;
+//    
+//    nvmParam.imuParam.gyro.power = 0;
+//    nvmParam.imuParam.gyro.odr = ISM330DLC_GY_ODR_104Hz;
+//    nvmParam.imuParam.gyro.range = ISM330DLC_2000dps;
+//    nvmParam.imuParam.gyro.lpf = 0;
+    
+    // config for BMI160 default
+    nvmParam.imuParam.accel.power = BMI160_ACCEL_NORMAL_MODE;
+    nvmParam.imuParam.accel.odr = BMI160_ACCEL_ODR_800HZ;
+    nvmParam.imuParam.accel.range = BMI160_ACCEL_RANGE_2G;
     nvmParam.imuParam.accel.lpf = 0;
     
-    nvmParam.imuParam.gyro.power = 0;
-    nvmParam.imuParam.gyro.odr = ISM330DLC_GY_ODR_104Hz;
-    nvmParam.imuParam.gyro.range = ISM330DLC_2000dps;
-    nvmParam.imuParam.gyro.lpf = 0;
+    nvmParam.imuParam.gyro.power = BMI160_GYRO_NORMAL_MODE;
+    nvmParam.imuParam.gyro.odr = BMI160_GYRO_ODR_800HZ;
+    nvmParam.imuParam.gyro.range = BMI160_GYRO_RANGE_2000_DPS;
+    nvmParam.imuParam.gyro.lpf = 0;    
 
     //nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
     eepromWrite(OFFSET_NVM_CONFIG,nvmSz,(uint8_t*)&nvmParam);
@@ -316,13 +347,21 @@ static THD_FUNCTION(procOperation ,p)
     runTime.time.scale.z = adxl.sensitivity;
   }
   else if(activeSensor == SENSOR_BMI160){
-    
+    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
+//    runTime.ledBlink.ms_on = 500;
+//    runTime.ledBlink.ms_off = 500;
+    //bmi160_dev_init(&bmi160);
+    bmi160_start(&bmi160);
+    runTime.time.scale.x = bmi160.lsb_accel;
+    runTime.time.scale.y = bmi160.lsb_accel;
+    runTime.time.scale.z = bmi160.lsb_accel;
   }
   else if(activeSensor == SENSOR_ISM330){
     chEvtRegisterMask(&ism330.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
 //    runTime.ledBlink.ms_on = 500;
 //    runTime.ledBlink.ms_off = 500;
     ism330_start(&ism330);
+    
     runTime.time.scale.x = ism330.lsb_accel;
     runTime.time.scale.y = ism330.lsb_accel;
     runTime.time.scale.z = ism330.lsb_accel;
@@ -454,41 +493,101 @@ static THD_FUNCTION(procOperation ,p)
         break;
       case OP_VNODE:
       case OP_OLED:
-        if(ism330_cmd_fifo_read(&ism330,runTime.buffer,300,&readSz)){
-          sz = readSz/12; // nof records
-          if(ignorePacket > 0){
-            ignorePacket--;
-            continue;
+        if(activeSensor == SENSOR_ISM330){
+          if(ism330_cmd_fifo_read(&ism330,runTime.buffer,300,&readSz)){
+            sz = readSz/12; // nof records
+            if(ignorePacket > 0){
+              ignorePacket--;
+              continue;
+            }
+            if(feed_fifo16_imu(&runTime.time,(uint8_t*)runTime.buffer,sz)==1){
+              memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
+              memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
+              memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
+              runTime.peak.x = (int32_t)((runTime.time.peak.x - runTime.time.peakn.x)*1000);
+              runTime.peak.y = (int32_t)((runTime.time.peak.y - runTime.time.peakn.y)*1000);
+              runTime.peak.z = (int32_t)((runTime.time.peak.z - runTime.time.peakn.z)*1000);
+              runTime.peak.x /= 1000;
+              runTime.peak.y /= 1000;
+              runTime.peak.z /= 1000;
+              
+              runTime.rms.x = (int32_t)(runTime.rms.x * 1000)/1000;
+              runTime.rms.y = (int32_t)(runTime.rms.y * 1000)/1000;
+              runTime.rms.z = (int32_t)(runTime.rms.z * 1000)/1000;
+              runTime.crest.x = (int32_t)(runTime.crest.x * 1000)/1000;
+              runTime.crest.y = (int32_t)(runTime.crest.y * 1000)/1000;
+              runTime.crest.z = (int32_t)(runTime.crest.z * 1000)/1000;
+              runTime.velocity.x = (int32_t)(runTime.velocity.x * 1000)/1000;
+              runTime.velocity.y = (int32_t)(runTime.velocity.y * 1000)/1000;
+              runTime.velocity.z = (int32_t)(runTime.velocity.z * 1000)/1000;
+              
+              resetObject(&runTime.time);
+              // send data via WIFI/BT
+  //            header = (cmd_header_t*)buf;
+  //            header->magic1 = MAGIC1;
+  //            header->magic2 = MAGIC2;
+  //            header->type = MASK_DATA;
+  //            header->pid = pktCount++;
+  //            uint8_t *ptr = &buf[CMD_STRUCT_SZ];
+  //            memcpy(ptr,&runTime.peak,12);
+  //            ptr += 12;
+  //            memcpy(ptr,&runTime.rms,12);
+  //            ptr += 12;
+  //            memcpy(ptr,&runTime.crest,12);
+  //            ptr += 12;
+  //            memcpy(ptr,&runTime.velocity,12);
+  //            ptr += 12;
+  //            header->len = 48 + CMD_STRUCT_SZ;
+  //            header->chksum = cmd_checksum(buf,header->len);
+  //            if(stream != NULL){
+  //              streamWrite(stream,runTime.buffer,header->len);
+  //            }
+            }
           }
-          if(feed_fifo16_imu(&runTime.time,(uint8_t*)runTime.buffer,sz)==1){
-            memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
-            memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
-            memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
-            runTime.peak.x = (runTime.time.peak.x - runTime.time.peakn.x);
-            runTime.peak.y = (runTime.time.peak.y - runTime.time.peakn.y);
-            runTime.peak.z = (runTime.time.peak.z - runTime.time.peakn.z);
-            resetObject(&runTime.time);
-            // send data via WIFI/BT
-//            header = (cmd_header_t*)buf;
-//            header->magic1 = MAGIC1;
-//            header->magic2 = MAGIC2;
-//            header->type = MASK_DATA;
-//            header->pid = pktCount++;
-//            uint8_t *ptr = &buf[CMD_STRUCT_SZ];
-//            memcpy(ptr,&runTime.peak,12);
-//            ptr += 12;
-//            memcpy(ptr,&runTime.rms,12);
-//            ptr += 12;
-//            memcpy(ptr,&runTime.crest,12);
-//            ptr += 12;
-//            memcpy(ptr,&runTime.velocity,12);
-//            ptr += 12;
-//            header->len = 48 + CMD_STRUCT_SZ;
-//            header->chksum = cmd_checksum(buf,header->len);
-//            if(stream != NULL){
-//              streamWrite(stream,runTime.buffer,header->len);
-//            }
+        }
+        else if(activeSensor == SENSOR_BMI160){
+          //chSysLock();
+          if(bmi160_fifo_read(&bmi160,runTime.buffer,300,&readSz) == MSG_OK){
+            sz = readSz/12; // nof records
+            if(ignorePacket > 0){
+              ignorePacket--;
+              continue;
+            }
+            if(feed_fifo16_imu(&runTime.time,(uint8_t*)runTime.buffer,sz)==1){
+              memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
+              memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
+              memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
+              runTime.peak.x = (int32_t)((runTime.time.peak.x - runTime.time.peakn.x)*1000);
+              runTime.peak.y = (int32_t)((runTime.time.peak.y - runTime.time.peakn.y)*1000);
+              runTime.peak.z = (int32_t)((runTime.time.peak.z - runTime.time.peakn.z)*1000);
+              runTime.peak.x /= 1000;
+              runTime.peak.y /= 1000;
+              runTime.peak.z /= 1000;
+              
+              runTime.rms.x = ((int32_t)(runTime.rms.x * 1000));
+              runTime.rms.y = ((int32_t)(runTime.rms.y * 1000));
+              runTime.rms.z = ((int32_t)(runTime.rms.z * 1000));
+              runTime.crest.x = ((int32_t)(runTime.crest.x * 1000));
+              runTime.crest.y = ((int32_t)(runTime.crest.y * 1000));
+              runTime.crest.z = ((int32_t)(runTime.crest.z * 1000));
+              runTime.velocity.x = ((int32_t)(runTime.velocity.x * 1000));
+              runTime.velocity.y = ((int32_t)(runTime.velocity.y * 1000));
+              runTime.velocity.z = ((int32_t)(runTime.velocity.z * 1000));
+              runTime.rms.x /= 1000;
+              runTime.rms.y /= 1000;
+              runTime.rms.z /= 1000;
+              runTime.crest.x /= 1000;
+              runTime.crest.y /= 1000;
+              runTime.crest.z /= 1000;
+              runTime.velocity.x /= 1000;
+              runTime.velocity.y /= 1000;
+              runTime.velocity.z /= 1000;
+
+
+              resetObject(&runTime.time);
+            }
           }
+          //chSysUnlock();
         }
         break;          
       }
@@ -558,6 +657,8 @@ void vnode_app_init()
   chVTObjectInit(&runTime.blinker);;
   chVTSet(&runTime.blinker,TIME_MS2I(100),blink_cb,NULL);
   //nvmParam.nodeParam.activeSensor = SENSOR_ISM330;
+  
+  //nvmParam.nodeParam.activeSensor = SENSOR_BMI160;
 
   if(nvmParam.nodeParam.activeSensor == SENSOR_ADXL355){
     memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
@@ -577,6 +678,13 @@ void vnode_app_init()
     }
   }
   
+  else if(nvmParam.nodeParam.activeSensor == SENSOR_BMI160){    
+    if(bmi160_dev_init(&bmi160) == MSG_OK){
+      runTime.sensorReady = SENSOR_BMI160;
+    }
+    memcpy((uint8_t*)&bmi160.imu.accel_cfg,(uint8_t*)&nvmParam.imuParam.accel,sizeof(nvmParam.imuParam.accel));
+    memcpy((uint8_t*)&bmi160.imu.gyro_cfg,(uint8_t*)&nvmParam.imuParam.gyro,sizeof(nvmParam.imuParam.gyro));
+  }
   
   ntcInit(2.72,(float)nvmParam.ntc_config.shunt_resistance/10.,(float)nvmParam.ntc_config.resistance/10.,nvmParam.ntc_config.beta,nvmParam.ntc_config.beta_temp);
 

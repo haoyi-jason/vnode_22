@@ -249,6 +249,11 @@ void sdReadFile(FSDriver *sdfsp)
   chEvtBroadcastFlags(&sdfsp->evs_insertion,EV_SD_READ);
 }
 
+void sdReMoveFile(FSDriver *sdfsp)
+{
+  chEvtBroadcastFlags(&sdfsp->evs_insertion,EV_SD_REMOVE);
+}
+
 void sdfsInit(void){}
 
 void sdfsObjectInit(FSDriver *sdfsp)

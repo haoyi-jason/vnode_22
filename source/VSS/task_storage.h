@@ -8,6 +8,7 @@
 #define EV_SD_WRITE       EVENT_MASK(1)
 #define EV_SD_READ       EVENT_MASK(2)
 #define EV_SD_LS        EVENT_MASK(3)        
+#define EV_SD_REMOVE       EVENT_MASK(4)
 
 enum fs_actions{
   FS_OP_MOUNT,
@@ -77,5 +78,6 @@ void sdfsStop(void);
 void sdfs_loadCard(FSDriver *dev);
 size_t sdfs_write(FSDriver *dev, char *fileName, uint8_t *buff, size_t sz);
 void sdfs_insertData(FSDriver *dev,const uint8_t *bp, size_t n);
+void sdReMoveFile(FSDriver *sdfsp);
 
 #endif

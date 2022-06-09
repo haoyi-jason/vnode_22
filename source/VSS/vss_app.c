@@ -61,6 +61,7 @@ void cmd_read(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data
 void cmd_list_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_read_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 void cmd_write_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
+void cmd_remove_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data);
 BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x00,0,0},cmd_config}, // node param
   {{0xab,0xba,0xA2,0x01,0,0},cmd_config}, // adxl param
@@ -75,6 +76,7 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA3,0x11,0,0},cmd_list_file},
   {{0xab,0xba,0xA3,0x03,0,0},cmd_read_file},
   {{0xab,0xba,0xA3,0x04,0,0},cmd_write_file},
+  {{0xab,0xba,0xA3,0x05,0,0},cmd_remove_file},
   {{0xab,0xba,0x01,0x00,0,0},NULL},
 };
 
@@ -932,6 +934,23 @@ void vnode_app_init()
       read_file();
     }
     
+    if(flags & EV_SD_REMOVE){
+      BinCommandHeader *header = (BinCommandHeader*)runTime.buffer;
+      header->magic1 = MAGIC1;
+      header->magic2 = MAGIC2;
+      if(f_unlink(SDFS1.fileName) == FR_OK){
+        header->type = MASK_CMD_RET_OK;
+        header->pid = 0x01;
+      }
+      else{
+        header->type = MASK_CMD_RET_ERR;
+        header->pid = 0x00;
+      }
+      header->len = CMD_STRUCT_SZ;
+      header->chksum = checksum(runTime.buffer,header->len);
+      streamWrite((BaseSequentialStream *)&SDW1,runTime.buffer,header->len);
+    }
+
     if(evt & EV_USER_BUTTON){
       startTransfer((BaseSequentialStream*)&SDFS1);
     }
@@ -1237,6 +1256,20 @@ void cmd_write_file(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *d
   
 }
 
+void cmd_remove_file(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
+{
+  char fileName[32];
+  uint32_t offset;
+  UINT readSz = 256;
+  UINT szRead;
+  if(hin->len == 40){ // name[32]
+    // read remaining data
+    streamRead(chp,fileName,32);
+    memcpy(SDFS1.fileName,fileName,32);
+    sdReMoveFile(&SDFS1);
+    
+  }
+}
 
 
 int main()
