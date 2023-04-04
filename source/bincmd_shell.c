@@ -78,7 +78,7 @@ THD_FUNCTION(binshellProc,p)
   uint8_t header[8];
   while(!chThdShouldTerminateX()){
     if(shellGetCommand(scfg,header,8)){
-      chThdSleepMilliseconds(100);
+      chThdSleepMilliseconds(10);
     }
     else{
       cmdexec(scp,chp,header);
@@ -87,6 +87,7 @@ THD_FUNCTION(binshellProc,p)
   
   chSysLock();
   chEvtBroadcastI(&shell_terminated);
+  chSysUnlock();
   chThdExitS(MSG_OK);
 }
 

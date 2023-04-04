@@ -13,6 +13,9 @@
 #include "ylib/sensor/bmi160/bmi160_defs.h"
 #include "ylib/sensor/bmi160/bmi160_dev.h"
 
+#include "ylib/numeric/filters/recursive.h"
+
+#include "ylib/numeric/frequency/cmsis_fft.h"
 
 #define NVM_FLAG        0xAC
 
@@ -36,6 +39,7 @@ struct _nvmParam{
   }ntc_config;
 };
 
+
 struct _runTime{
   thread_t *self;
   thread_t *opThread;
@@ -57,6 +61,12 @@ struct _runTime{
   }ledBlink;
   uint8_t sensorReady;
   float temperature[2];
+  _hpf_3d hpf;
+  _fft_data_t fft_data;
+  uint16_t max_bin_index;
+  float bin_freq;
+  float freq[5];
+  float fft_bins[FFT_SAMPLE_NUMBER>>1];
 };
 
 #define ADC_GRP1_NUM_CHANNELS   2
@@ -215,12 +225,12 @@ static void load_settings()
     
     // config for BMI160 default
     nvmParam.imuParam.accel.power = BMI160_ACCEL_NORMAL_MODE;
-    nvmParam.imuParam.accel.odr = BMI160_ACCEL_ODR_800HZ;
-    nvmParam.imuParam.accel.range = BMI160_ACCEL_RANGE_2G;
+    nvmParam.imuParam.accel.odr = BMI160_ACCEL_ODR_1600HZ;
+    nvmParam.imuParam.accel.range = BMI160_ACCEL_RANGE_16G;
     nvmParam.imuParam.accel.lpf = 0;
     
     nvmParam.imuParam.gyro.power = BMI160_GYRO_NORMAL_MODE;
-    nvmParam.imuParam.gyro.odr = BMI160_GYRO_ODR_800HZ;
+    nvmParam.imuParam.gyro.odr = BMI160_GYRO_ODR_1600HZ;
     nvmParam.imuParam.gyro.range = BMI160_GYRO_RANGE_2000_DPS;
     nvmParam.imuParam.gyro.lpf = 0;    
 
@@ -333,6 +343,8 @@ static THD_FUNCTION(procOperation ,p)
   //eventflags_t flags;
 //  activeSensor = SENSOR_ISM330;
   //activeSensor = SENSOR_ADXL355;
+  float scale = 1.0;
+  runTime.bin_freq = 1.0;
   if(activeSensor == SENSOR_ADXL355){
     chEvtRegisterMask(&adxl.evsource,&runTime.el_sensor,EV_ADXL_FIFO_FULL);
 //    runTime.ledBlink.ms_on = 500;
@@ -345,6 +357,9 @@ static THD_FUNCTION(procOperation ,p)
     runTime.time.scale.x = adxl.sensitivity;
     runTime.time.scale.y = adxl.sensitivity;
     runTime.time.scale.z = adxl.sensitivity;
+    scale = adxl.sensitivity;
+    float rate = 4000./(1 << (adxl.config->outputrate));
+    runTime.bin_freq = rate/(float)FFT_SAMPLE_NUMBER;
   }
   else if(activeSensor == SENSOR_BMI160){
     chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
@@ -367,6 +382,12 @@ static THD_FUNCTION(procOperation ,p)
     runTime.time.scale.z = ism330.lsb_accel;
   }
   
+  runTime.hpf.x.type = HPF;
+  runTime.hpf.y.type = HPF;
+  runTime.hpf.z.type = HPF;
+  recursive_set_single_pole(&runTime.hpf.x,0.95);
+  recursive_set_single_pole(&runTime.hpf.y,0.95);
+  recursive_set_single_pole(&runTime.hpf.z,0.95);
   
 //  uint8_t packetToIgnore = 5;
 //  if(runTime.resetBuffer != NULL){
@@ -428,42 +449,25 @@ static THD_FUNCTION(procOperation ,p)
               *(p_dst--)=*(p_src++);
             }
           }
-//          if(packetToIgnore){
-//            packetToIgnore--;
+          // time domain
+//          if(feed_fifo32(&runTime.time,(uint8_t*)data,sz)==1){
+//            // update modbus data
+//            memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
+//            memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
+//            memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
+//            runTime.peak.x = (runTime.time.peak.x - runTime.time.peakn.x);
+//            runTime.peak.y = (runTime.time.peak.y - runTime.time.peakn.y);
+//            runTime.peak.z = (runTime.time.peak.z - runTime.time.peakn.z);
+//            resetObject(&runTime.time);
 //          }
-          if(feed_fifo32(&runTime.time,(uint8_t*)data,sz)==1){
-            // update modbus data
-            memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
-            memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
-            memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
-            runTime.peak.x = (runTime.time.peak.x - runTime.time.peakn.x);
-            runTime.peak.y = (runTime.time.peak.y - runTime.time.peakn.y);
-            runTime.peak.z = (runTime.time.peak.z - runTime.time.peakn.z);
-            resetObject(&runTime.time);
-            
-            // send data via WIFI/BT
-            // prepare data transmit
-            if(opMode == OP_VNODE){
-//              header = (BinCommandHeader*)runTime.buffer;
-//              header->magic1 = MAGIC1;
-//              header->magic2 = MAGIC2;
-//              header->type = MASK_DATA;
-//              header->pid = pktCount++;
-//              uint8_t *ptr = &runTime.buffer[CMD_STRUCT_SZ];
-//              memcpy(ptr,&runTime.peak,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.rms,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.crest,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.velocity,12);
-//              ptr += 12;
-//              header->len = 48 + CMD_STRUCT_SZ;
-//              header->chksum = checksum(runTime.buffer,header->len);
-//              if(stream != NULL){
-//                streamWrite(stream,runTime.buffer, header->len);
-//              }              
-            }
+          
+          // FFT
+          fft_feed_fifo_adxl(&runTime.fft_data,(uint8_t*)data,sz,scale);
+          if(runTime.fft_data.newData == 1){
+            memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+            runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+            runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
+            runTime.fft_data.newData = 0;
           }
           break;
         }
@@ -553,7 +557,7 @@ static THD_FUNCTION(procOperation ,p)
               ignorePacket--;
               continue;
             }
-            if(feed_fifo16_imu(&runTime.time,(uint8_t*)runTime.buffer,sz)==1){
+            if(feed_fifo16_imu_hpf(&runTime.time,(uint8_t*)runTime.buffer,&runTime.hpf,sz)==1){
               memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
               memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
               memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
@@ -660,6 +664,7 @@ void vnode_app_init()
   
   //nvmParam.nodeParam.activeSensor = SENSOR_BMI160;
 
+  nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
   if(nvmParam.nodeParam.activeSensor == SENSOR_ADXL355){
     memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
     
@@ -698,6 +703,7 @@ void vnode_app_init()
   
   timeDomainInit(&runTime.time);
   runTime.time.nofSamples = nvmParam.time.sampleNumber;
+  cmsis_fft_init(&runTime.fft_data);
   
 //  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(1));
   startTransfer(NULL);
@@ -712,6 +718,15 @@ int main()
   thread_t *shelltp1 = NULL;
   halInit();
   chSysInit();
+  
+  float32_t f_input_cmsis_dsp = 2;
+  float32_t f_result_cmsis_dsp;
+  
+  float f_input = 2;
+  float f_result;
+  
+  arm_sqrt_f32(f_input_cmsis_dsp,&f_result_cmsis_dsp);
+  f_result = sqrt(f_input);
   
   
   vnode_app_init();
@@ -868,6 +883,26 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
       }
       memcpy(dptr,(uint8_t *)&iv16,2);
     }
+    else if(RANGE_CHECK(address,1021,1023)){
+      if(address == 1021){
+        iv16 = runTime.max_bin_index + 1024;
+        mapMBWord(dptr,(uint8_t*)&iv16);
+      }
+      else if(address == 1022){
+        mapMBFloat(dptr,(uint8_t*)&runTime.freq[0]);
+        ret = 2;
+      }
+      
+    }
+    else if(RANGE_CHECK(address,1024,3072)){
+      mapMBFloat(dptr,(uint8_t*)&runTime.fft_bins[address - 1024]);
+      ret = 2;
+    }
+    else{
+      iv16 = 0;
+      memcpy(dptr,(uint8_t *)&iv16,2);
+      ret = 1;
+    }
   }
   else{
     uint8_t save = 0;
@@ -899,6 +934,10 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
           }
           break;
         case SENSOR_BMI160:
+          if((iv16 == 0x03) || (iv16 == 0x05) || (iv16 == 0x08) || (iv16 == 0x0c)){
+            nvmParam.imuParam.accel.range = iv16;
+            save = 1;
+          }
           break;
         case SENSOR_ISM330:
           if(RANGE_CHECK(iv16,0,3)){
@@ -919,6 +958,10 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
           }
           break;
         case SENSOR_BMI160:
+          if(RANGE_CHECK(iv16,1,12)){
+            nvmParam.imuParam.accel.odr = iv16;
+            save = 1;
+          }
           break;
         case SENSOR_ISM330:
           if(RANGE_CHECK(iv16,0,10)){
@@ -937,6 +980,10 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
           save = 1;
           break;
         case SENSOR_BMI160:
+          if((iv16 >=0) && (iv16 <=2)){
+            nvmParam.imuParam.accel.lpf = iv16;
+            save = 1;
+          }
           break;
         case SENSOR_ISM330:
           break;
@@ -1002,6 +1049,9 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
         NVIC_SystemReset();
       }
     }
+    else{
+      ret = 1;
+    }
     if(save == 1){
       save_settings(0);
     }
@@ -1026,8 +1076,14 @@ static void adccallback(ADCDriver *adcp)
   }
   
   for(uint8_t j=0;j<ADC_GRP1_NUM_CHANNELS;j++){
-    float r = (float)(chSum[j])/(4096.);
-    runTime.temperature[j] = ntcGetTempFromRatioF_RTOP(r);
+    if((chSum[j] < 100) || (chSum[j] > 4000)){
+      runTime.temperature[j] = 0;
+    }
+    else{
+      float r = (float)(chSum[j])/(4096.);
+  //    runTime.temperature[j] = ntcGetTempFromRatioF_RTOP(r);
+      runTime.temperature[j] = ntcGetTempFromRatioF_RBOT(r);
+    }
   }
   
 }

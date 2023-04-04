@@ -391,7 +391,7 @@
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\various\lwip_bindings</state>
                     <state>D:\SourceRespo\redpine\RS9116.NB0.WC.GENR.OSI.1.1.1\host\sapis\include</state>
                     <state>D:\SourceRespo\redpine\RS9116.NB0.WC.GENR.OSI.1.1.1\host\sapis\rom</state>
-                    <state>D:\SourceRespo\ylib\wireless\redpine</state>
+                    <state>D:\SourceRespo\</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -3346,11 +3346,11 @@
                 </option>
                 <option>
                     <name>OGUseCmsis</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
                 <option>
                     <name>OGUseCmsisDspLib</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
                 <option>
                     <name>GRuntimeLibThreads</name>
@@ -3635,6 +3635,7 @@
                     <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\rtu</state>
                     <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\tcp</state>
                     <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\udp</state>
+                    <state>D:\SourceRespo\ARM_LIBS\CMSIS_5-5.6.0\CMSIS\DSP\Include</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -3943,7 +3944,7 @@
                 </option>
                 <option>
                     <name>OOCOutputFile</name>
-                    <state>VNODE_RTU_ISM_220314.hex</state>
+                    <state>VNODE_RTU_ISM_BMI_xxxxxx.hex</state>
                 </option>
                 <option>
                     <name>OOCCommandLineProducer</name>
@@ -5047,7 +5048,7 @@
                 </option>
                 <option>
                     <name>OOCOutputFile</name>
-                    <state>DoorSpeed_V2_220331.hex</state>
+                    <state>DoorSpeed_V2_xxxxxx.hex</state>
                 </option>
                 <option>
                     <name>OOCCommandLineProducer</name>
@@ -5511,7 +5512,7 @@
                 </option>
                 <option>
                     <name>OGChipSelectEditMenu</name>
-                    <state>AT32F413CB	ArteryTek AT32F413CB</state>
+                    <state>AT32F413C8	ArteryTek AT32F413C8</state>
                 </option>
                 <option>
                     <name>GenLowLevelInterface</name>
@@ -5571,7 +5572,7 @@
                 </option>
                 <option>
                     <name>GFPUDeviceSlave</name>
-                    <state>AT32F413CB	ArteryTek AT32F413CB</state>
+                    <state>AT32F413C8	ArteryTek AT32F413C8</state>
                 </option>
                 <option>
                     <name>FPU2</name>
@@ -6135,7 +6136,7 @@
                 </option>
                 <option>
                     <name>OOCOutputFile</name>
-                    <state>DoorSpeedSubMCU_AT32.hex</state>
+                    <state>DoorSpeedSubMCU_AT32_xxxxxxxx.hex</state>
                 </option>
                 <option>
                     <name>OOCCommandLineProducer</name>
@@ -6522,14 +6523,1120 @@
             <data />
         </settings>
     </configuration>
+    <configuration>
+        <name>VNODE_WIRELESS</name>
+        <toolchain>
+            <name>ARM</name>
+        </toolchain>
+        <debug>1</debug>
+        <settings>
+            <name>General</name>
+            <archiveVersion>3</archiveVersion>
+            <data>
+                <version>31</version>
+                <wantNonLocal>1</wantNonLocal>
+                <debug>1</debug>
+                <option>
+                    <name>ExePath</name>
+                    <state>VNODE_WIRELESS\Exe</state>
+                </option>
+                <option>
+                    <name>ObjPath</name>
+                    <state>VNODE_WIRELESS\Obj</state>
+                </option>
+                <option>
+                    <name>ListPath</name>
+                    <state>VNODE_WIRELESS\List</state>
+                </option>
+                <option>
+                    <name>GEndianMode</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>Input description</name>
+                    <state>Automatic choice of formatter, without multibyte support.</state>
+                </option>
+                <option>
+                    <name>Output description</name>
+                    <state>Automatic choice of formatter, without multibyte support.</state>
+                </option>
+                <option>
+                    <name>GOutputBinary</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGCoreOrChip</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>GRuntimeLibSelect</name>
+                    <version>0</version>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>GRuntimeLibSelectSlave</name>
+                    <version>0</version>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>RTDescription</name>
+                    <state>Use the normal configuration of the C/C++ runtime library. No locale interface, C locale, no file descriptor support, no multibytes in printf and scanf, and no hex floats in strtod.</state>
+                </option>
+                <option>
+                    <name>OGProductVersion</name>
+                    <state>8.32.4.20866</state>
+                </option>
+                <option>
+                    <name>OGLastSavedByProductVersion</name>
+                    <state>8.32.4.20866</state>
+                </option>
+                <option>
+                    <name>GeneralEnableMisra</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>GeneralMisraVerbose</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGChipSelectEditMenu</name>
+                    <state>STM32F411RE	ST STM32F411RE</state>
+                </option>
+                <option>
+                    <name>GenLowLevelInterface</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>GEndianModeBE</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>OGBufferedTerminalOutput</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>GenStdoutInterface</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>GeneralMisraRules98</name>
+                    <version>0</version>
+                    <state>1000111110110101101110011100111111101110011011000101110111101101100111111111111100110011111001110111001111111111111111111111111</state>
+                </option>
+                <option>
+                    <name>GeneralMisraVer</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>GeneralMisraRules04</name>
+                    <version>0</version>
+                    <state>111101110010111111111000110111111111111111111111111110010111101111010101111111111111111111111111101111111011111001111011111011111111111111111</state>
+                </option>
+                <option>
+                    <name>RTConfigPath2</name>
+                    <state>$TOOLKIT_DIR$\inc\c\DLib_Config_Normal.h</state>
+                </option>
+                <option>
+                    <name>GBECoreSlave</name>
+                    <version>27</version>
+                    <state>39</state>
+                </option>
+                <option>
+                    <name>OGUseCmsis</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGUseCmsisDspLib</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>GRuntimeLibThreads</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CoreVariant</name>
+                    <version>27</version>
+                    <state>39</state>
+                </option>
+                <option>
+                    <name>GFPUDeviceSlave</name>
+                    <state>STM32F411RE	ST STM32F411RE</state>
+                </option>
+                <option>
+                    <name>FPU2</name>
+                    <version>0</version>
+                    <state>4</state>
+                </option>
+                <option>
+                    <name>NrRegs</name>
+                    <version>0</version>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>NEON</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>GFPUCoreSlave2</name>
+                    <version>27</version>
+                    <state>39</state>
+                </option>
+                <option>
+                    <name>OGCMSISPackSelectDevice</name>
+                </option>
+                <option>
+                    <name>OgLibHeap</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGLibAdditionalLocale</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGPrintfVariant</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGPrintfMultibyteSupport</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGScanfVariant</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OGScanfMultibyteSupport</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>GenLocaleTags</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>GenLocaleDisplayOnly</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>DSPExtension</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>TrustZone</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>TrustZoneModes</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+            </data>
+        </settings>
+        <settings>
+            <name>ICCARM</name>
+            <archiveVersion>2</archiveVersion>
+            <data>
+                <version>35</version>
+                <wantNonLocal>1</wantNonLocal>
+                <debug>1</debug>
+                <option>
+                    <name>CCDefines</name>
+                    <state>RSI_WLAN_ENABLE</state>
+                    <state>RSI_BT_ENABLE</state>
+                    <state>RSI_WITH_OS</state>
+                    <state>RSI_SAMPLE_HAL</state>
+                    <state>RSI_SPI_INTERFACE</state>
+                    <state>STM32F411xE</state>
+                </option>
+                <option>
+                    <name>CCPreprocFile</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCPreprocComments</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCPreprocLine</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CCListCFile</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCListCMnemonics</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCListCMessages</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCListAssFile</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCListAssSource</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCEnableRemarks</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCDiagSuppress</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>CCDiagRemark</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>CCDiagWarning</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>CCDiagError</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>CCObjPrefix</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CCAllowList</name>
+                    <version>1</version>
+                    <state>00000000</state>
+                </option>
+                <option>
+                    <name>CCDebugInfo</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IEndianMode</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IProcessor</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IExtraOptionsCheck</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IExtraOptions</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>CCLangConformance</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCSignedPlainChar</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CCRequirePrototypes</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCDiagWarnAreErr</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCCompilerRuntimeInfo</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IFpuProcessor</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>OutputFile</name>
+                    <state>$FILE_BNAME$.o</state>
+                </option>
+                <option>
+                    <name>CCLibConfigHeader</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>PreInclude</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>CompilerMisraOverride</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCIncludePath2</name>
+                    <state>$PROJ_DIR$\</state>
+                    <state>$PROJ_DIR$\board\VNODE_ST_Serial</state>
+                    <state>$PROJ_DIR$\include\VNODE_ST_Serial</state>
+                    <state>$PROJ_DIR$\source</state>
+                    <state>$PROJ_DIR$\source\VSS</state>
+                    <state>$PROJ_DIR$\source\at32_comm</state>
+                    <state>$PROJ_DIR$\source\fmbport</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\abstractions\cmsis_os</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ext\ARM\CMSIS\Core\Include</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ext\ST\STM32F4xx</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ports\ARMCMx</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ports\ARMCMx\compilers\IAR</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\oslib\include</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\license</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\include</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\lib\streams</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\osal\rt-nil</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\common\ARMCMx</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\startup\ARMCMx\devices\STM32F4xx</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\ADCv2</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\CANv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\DACv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\DMAv2</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\EXTIv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\GPIOv2</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\I2Cv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\MACv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\OTGv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\QUADSPIv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\RTCv2</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\SDIOv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\SPIv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\TIMv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\USARTv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\LLD\xWDGv1</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\hal\ports\STM32\STM32F4xx</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\rt\include</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\various\cpp_wrappers</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\various\fatfs_bindings</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\various\shell</state>
+                    <state>D:\SourceRespo\</state>
+                    <state>D:\SourceRespo\ylib\numeric\time</state>
+                    <state>D:\SourceRespo\ylib\protocol\bincmd</state>
+                    <state>D:\SourceRespo\ylib\wireless\lora</state>
+                    <state>D:\SourceRespo\ylib\sensor\ntc</state>
+                    <state>D:\SourceRespo\ylib\sensor\adxl355</state>
+                    <state>D:\SourceRespo\ylib\network\udpserver</state>
+                    <state>D:\SourceRespo\ylib\display</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\ext\lwip-2.1.2\lwip\src\include</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\various\lwip_bindings</state>
+                    <state>D:\SourceRespo\redpine\RS9116.NB0.WC.GENR.OSI.1.1.1\host\sapis\include</state>
+                    <state>D:\SourceRespo\redpine\RS9116.NB0.WC.GENR.OSI.1.1.1\host\sapis\rom</state>
+                    <state>D:\SourceRespo\ylib\wireless\redpine</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\ext\fatfs\src</state>
+                    <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\include</state>
+                    <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\ascii</state>
+                    <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\functions</state>
+                    <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\rtu</state>
+                    <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\tcp</state>
+                    <state>D:\SourceRespo\freemodbus_src\mbslave-v2.9.f\mbslave-v2.9.f\mbslave\udp</state>
+                </option>
+                <option>
+                    <name>CCStdIncCheck</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCCodeSection</name>
+                    <state>.text</state>
+                </option>
+                <option>
+                    <name>IProcessorMode2</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CCOptLevel</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CCOptStrategy</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCOptLevelSlave</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CompilerMisraRules98</name>
+                    <version>0</version>
+                    <state>1000111110110101101110011100111111101110011011000101110111101101100111111111111100110011111001110111001111111111111111111111111</state>
+                </option>
+                <option>
+                    <name>CompilerMisraRules04</name>
+                    <version>0</version>
+                    <state>111101110010111111111000110111111111111111111111111110010111101111010101111111111111111111111111101111111011111001111011111011111111111111111</state>
+                </option>
+                <option>
+                    <name>CCPosIndRopi</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCPosIndRwpi</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCPosIndNoDynInit</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IccLang</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IccCDialect</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IccAllowVLA</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IccStaticDestr</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IccCppInlineSemantics</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IccCmsis</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IccFloatSemantics</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCOptimizationNoSizeConstraints</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCNoLiteralPool</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCOptStrategySlave</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCGuardCalls</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CCEncSource</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCEncOutput</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CCEncOutputBom</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CCEncInput</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IccExceptions2</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IccRTTI2</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OICompilerExtraOption</name>
+                    <state>1</state>
+                </option>
+            </data>
+        </settings>
+        <settings>
+            <name>AARM</name>
+            <archiveVersion>2</archiveVersion>
+            <data>
+                <version>10</version>
+                <wantNonLocal>1</wantNonLocal>
+                <debug>1</debug>
+                <option>
+                    <name>AObjPrefix</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>AEndian</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>ACaseSensitivity</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>MacroChars</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AWarnEnable</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AWarnWhat</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AWarnOne</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>AWarnRange1</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>AWarnRange2</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>ADebug</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>AltRegisterNames</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>ADefines</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>AList</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AListHeader</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>AListing</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>Includes</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>MacDefs</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>MacExps</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>MacExec</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>OnlyAssed</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>MultiLine</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>PageLengthCheck</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>PageLength</name>
+                    <state>80</state>
+                </option>
+                <option>
+                    <name>TabSpacing</name>
+                    <state>8</state>
+                </option>
+                <option>
+                    <name>AXRef</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AXRefDefines</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AXRefInternal</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AXRefDual</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AProcessor</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>AFpuProcessor</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>AOutputFile</name>
+                    <state>$FILE_BNAME$.o</state>
+                </option>
+                <option>
+                    <name>ALimitErrorsCheck</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>ALimitErrorsEdit</name>
+                    <state>100</state>
+                </option>
+                <option>
+                    <name>AIgnoreStdInclude</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AUserIncludes</name>
+                    <state>$PROJ_DIR$\</state>
+                    <state>$PROJ_DIR$\board\VNODE_ST_Serial</state>
+                    <state>$PROJ_DIR$\include\VNODE_ST_Serial</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\license</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ports\ARMCMx</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\startup\ARMCMx\devices\AT32F4xx</state>
+                </option>
+                <option>
+                    <name>AExtraOptionsCheckV2</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>AExtraOptionsV2</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>AsmNoLiteralPool</name>
+                    <state>0</state>
+                </option>
+            </data>
+        </settings>
+        <settings>
+            <name>OBJCOPY</name>
+            <archiveVersion>0</archiveVersion>
+            <data>
+                <version>1</version>
+                <wantNonLocal>1</wantNonLocal>
+                <debug>1</debug>
+                <option>
+                    <name>OOCOutputFormat</name>
+                    <version>3</version>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>OCOutputOverride</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>OOCOutputFile</name>
+                    <state>VSS_V2_2022XXXX.hex</state>
+                </option>
+                <option>
+                    <name>OOCCommandLineProducer</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>OOCObjCopyEnable</name>
+                    <state>1</state>
+                </option>
+            </data>
+        </settings>
+        <settings>
+            <name>CUSTOM</name>
+            <archiveVersion>3</archiveVersion>
+            <data>
+                <extensions></extensions>
+                <cmdline></cmdline>
+                <hasPrio>0</hasPrio>
+            </data>
+        </settings>
+        <settings>
+            <name>BICOMP</name>
+            <archiveVersion>0</archiveVersion>
+            <data />
+        </settings>
+        <settings>
+            <name>BUILDACTION</name>
+            <archiveVersion>1</archiveVersion>
+            <data>
+                <prebuild></prebuild>
+                <postbuild></postbuild>
+            </data>
+        </settings>
+        <settings>
+            <name>ILINK</name>
+            <archiveVersion>0</archiveVersion>
+            <data>
+                <version>22</version>
+                <wantNonLocal>1</wantNonLocal>
+                <debug>1</debug>
+                <option>
+                    <name>IlinkLibIOConfig</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>XLinkMisraHandler</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkInputFileSlave</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkOutputFile</name>
+                    <state>VNODE_Base.out</state>
+                </option>
+                <option>
+                    <name>IlinkDebugInfoEnable</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkKeepSymbols</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkRawBinaryFile</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkRawBinarySymbol</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkRawBinarySegment</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkRawBinaryAlign</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkDefines</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkConfigDefines</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkMapFile</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkLogFile</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkLogInitialization</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkLogModule</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkLogSection</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkLogVeneer</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkIcfOverride</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkIcfFile</name>
+                    <state>$PROJ_DIR$\ch_stm32f407.icf</state>
+                </option>
+                <option>
+                    <name>IlinkIcfFileSlave</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkEnableRemarks</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkSuppressDiags</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkTreatAsRem</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkTreatAsWarn</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkTreatAsErr</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkWarningsAreErrors</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkUseExtraOptions</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkExtraOptions</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkLowLevelInterfaceSlave</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkAutoLibEnable</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkAdditionalLibs</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkOverrideProgramEntryLabel</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkProgramEntryLabelSelect</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkProgramEntryLabel</name>
+                    <state>__iar_program_start</state>
+                </option>
+                <option>
+                    <name>DoFill</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>FillerByte</name>
+                    <state>0xFF</state>
+                </option>
+                <option>
+                    <name>FillerStart</name>
+                    <state>0x0</state>
+                </option>
+                <option>
+                    <name>FillerEnd</name>
+                    <state>0x0</state>
+                </option>
+                <option>
+                    <name>CrcSize</name>
+                    <version>0</version>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CrcAlign</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CrcPoly</name>
+                    <state>0x11021</state>
+                </option>
+                <option>
+                    <name>CrcCompl</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CrcBitOrder</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>CrcInitialValue</name>
+                    <state>0x0</state>
+                </option>
+                <option>
+                    <name>DoCrc</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkBE8Slave</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkBufferedTerminalOutput</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkStdoutInterfaceSlave</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CrcFullSize</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkIElfToolPostProcess</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkLogAutoLibSelect</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkLogRedirSymbols</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkLogUnusedFragments</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkCrcReverseByteOrder</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkCrcUseAsInput</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkOptInline</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkOptExceptionsAllow</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkOptExceptionsForce</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkCmsis</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkOptMergeDuplSections</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkOptUseVfe</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkOptForceVfe</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkStackAnalysisEnable</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkStackControlFile</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkStackCallGraphFile</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>CrcAlgorithm</name>
+                    <version>1</version>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>CrcUnitSize</name>
+                    <version>0</version>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkThreadsSlave</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkLogCallGraph</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkIcfFile_AltDefault</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IlinkEncInput</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkEncOutput</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IlinkEncOutputBom</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkHeapSelect</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkLocaleSelect</name>
+                    <state>1</state>
+                </option>
+                <option>
+                    <name>IlinkTrustzoneImportLibraryOut</name>
+                    <state>VNODE_Base_import_lib.o</state>
+                </option>
+                <option>
+                    <name>OILinkExtraOption</name>
+                    <state>1</state>
+                </option>
+            </data>
+        </settings>
+        <settings>
+            <name>IARCHIVE</name>
+            <archiveVersion>0</archiveVersion>
+            <data>
+                <version>0</version>
+                <wantNonLocal>1</wantNonLocal>
+                <debug>1</debug>
+                <option>
+                    <name>IarchiveInputs</name>
+                    <state></state>
+                </option>
+                <option>
+                    <name>IarchiveOverride</name>
+                    <state>0</state>
+                </option>
+                <option>
+                    <name>IarchiveOutput</name>
+                    <state>###Unitialized###</state>
+                </option>
+            </data>
+        </settings>
+        <settings>
+            <name>BILINK</name>
+            <archiveVersion>0</archiveVersion>
+            <data />
+        </settings>
+    </configuration>
     <group>
         <name>Board</name>
         <group>
             <name>DoorSpeed_Sub</name>
             <excluded>
+                <configuration>Debug</configuration>
                 <configuration>VSS_PORT</configuration>
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$PROJ_DIR$\board\DoorSpeed_Sub\board.c</name>
@@ -6560,6 +7667,7 @@
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
                 <configuration>DoorSpeed_SubSys</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$PROJ_DIR$\board\VNODE\board.c</name>
@@ -6574,6 +7682,7 @@
                 <configuration>Debug</configuration>
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_SubSys</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$PROJ_DIR$\board\VSS\board.c</name>
@@ -6606,6 +7715,7 @@
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
                         <configuration>DoorSpeed_SubSys</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                     <group>
                         <name>osal</name>
@@ -6655,6 +7765,7 @@
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
                         <configuration>DoorSpeed_SubSys</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                 </file>
                 <file>
@@ -6668,6 +7779,7 @@
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
                         <configuration>DoorSpeed_SubSys</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                 </file>
                 <file>
@@ -6698,6 +7810,7 @@
                         <configuration>VSS_PORT</configuration>
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                 </file>
                 <file>
@@ -6732,6 +7845,7 @@
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
                         <configuration>DoorSpeed_SubSys</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                     <group>
                         <name>mfs</name>
@@ -6782,6 +7896,7 @@
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
                         <configuration>DoorSpeed_SubSys</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                     <file>
                         <name>$extsource$\ChibiOS\chibios203\os\hal\osal\lib\osal_vt.c</name>
@@ -6795,6 +7910,7 @@
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
                         <configuration>DoorSpeed_SubSys</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                     <file>
                         <name>$extsource$\ChibiOS\chibios203\os\hal\osal\os-less\ARMCMx\osal.c</name>
@@ -6815,6 +7931,7 @@
                         <configuration>VSS_PORT</configuration>
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                     <group>
                         <name>AT32F4xx</name>
@@ -6957,6 +8074,15 @@
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\AT32ST\LLD\USBv1\hal_usb_lld.c</name>
                             </file>
                         </group>
+                        <group>
+                            <name>xWDGV1</name>
+                            <file>
+                                <name>$extsource$\ChibiOS\chibios203\os\hal\ports\AT32ST\LLD\xWDGv1\hal_wdg_lld.c</name>
+                            </file>
+                            <file>
+                                <name>$extsource$\ChibiOS\chibios203\os\hal\ports\AT32ST\LLD\xWDGv1\hal_wdg_lld.h</name>
+                            </file>
+                        </group>
                     </group>
                 </group>
                 <group>
@@ -6981,6 +8107,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\ADCv1\hal_adc_lld.c</name>
@@ -7004,6 +8131,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\ADCv3\hal_adc_lld.c</name>
@@ -7017,6 +8145,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\ADCv4\hal_adc_lld.c</name>
@@ -7030,6 +8159,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\BDMAv1\stm32_bdma.c</name>
@@ -7049,6 +8179,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\CRYPv1\hal_crypto_lld.c</name>
@@ -7066,6 +8197,7 @@
                                 <configuration>VSS_PORT</configuration>
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\DMAv1\stm32_dma.c</name>
@@ -7095,6 +8227,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\FDCANv1\hal_can_lld.c</name>
@@ -7106,6 +8239,7 @@
                                 <configuration>VSS_PORT</configuration>
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\GPIOv1\hal_pal_lld.c</name>
@@ -7129,6 +8263,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\GPIOv3\hal_pal_lld.c</name>
@@ -7148,6 +8283,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\I2Cv2\hal_i2c_lld.c</name>
@@ -7161,6 +8297,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\I2Cv3\hal_i2c_lld.c</name>
@@ -7184,6 +8321,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\MDMAv1\stm32_mdma.c</name>
@@ -7197,6 +8335,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\OCTOSPIv1\hal_wspi_lld.c</name>
@@ -7230,6 +8369,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\QUADSPIv2\hal_wspi_lld.c</name>
@@ -7243,6 +8383,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\RNGv1\hal_trng_lld.c</name>
@@ -7254,6 +8395,7 @@
                                 <configuration>VSS_PORT</configuration>
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\RTCv1\hal_rtc_lld.c</name>
@@ -7277,6 +8419,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\RTCv3\hal_rtc_lld.c</name>
@@ -7296,6 +8439,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\SDMMCv1\hal_sdc_lld.c</name>
@@ -7309,6 +8453,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\SDMMCv2\hal_sdc_lld.c</name>
@@ -7331,6 +8476,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\SPIv2\hal_i2s_lld.c</name>
@@ -7347,6 +8493,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\SPIv3\hal_i2s_lld.c</name>
@@ -7387,6 +8534,7 @@
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
                                 <configuration>DoorSpeed_SubSys</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\USARTv2\hal_serial_lld.c</name>
@@ -7401,6 +8549,7 @@
                                 <configuration>VSS_PORT</configuration>
                                 <configuration>VNODE_ST_Serial</configuration>
                                 <configuration>DoorSpeed_V2</configuration>
+                                <configuration>VNODE_WIRELESS</configuration>
                             </excluded>
                             <file>
                                 <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\LLD\USBv1\hal_usb_lld.c</name>
@@ -7423,6 +8572,7 @@
                             <configuration>VSS_PORT</configuration>
                             <configuration>VNODE_ST_Serial</configuration>
                             <configuration>DoorSpeed_V2</configuration>
+                            <configuration>VNODE_WIRELESS</configuration>
                         </excluded>
                         <file>
                             <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\STM32F1xx\hal_adc_lld.c</name>
@@ -7461,6 +8611,7 @@
                             <configuration>VNODE_ST_Serial</configuration>
                             <configuration>DoorSpeed_V2</configuration>
                             <configuration>DoorSpeed_SubSys</configuration>
+                            <configuration>VNODE_WIRELESS</configuration>
                         </excluded>
                         <file>
                             <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\STM32L1xx\hal_adc_lld.c</name>
@@ -7480,6 +8631,7 @@
                             <configuration>VNODE_ST_Serial</configuration>
                             <configuration>DoorSpeed_V2</configuration>
                             <configuration>DoorSpeed_SubSys</configuration>
+                            <configuration>VNODE_WIRELESS</configuration>
                         </excluded>
                         <file>
                             <name>$extsource$\ChibiOS\chibios203\os\hal\ports\STM32\STM32L4xx+\hal_efl_lld.c</name>
@@ -7598,6 +8750,7 @@
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
                 <configuration>DoorSpeed_SubSys</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$extsource$\ChibiOS\chibios203\os\nil\src\ch.c</name>
@@ -7700,6 +8853,7 @@
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
                     <configuration>DoorSpeed_SubSys</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
                 <file>
                     <name>$extsource$\ChibiOS\chibios203\os\various\cpp_wrappers\ch.cpp</name>
@@ -7735,6 +8889,7 @@
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
                     <configuration>DoorSpeed_SubSys</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
                 <file>
                     <name>$extsource$\ChibiOS\chibios203\os\various\lwip_bindings\lwipthread.c</name>
@@ -7754,6 +8909,7 @@
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
                     <configuration>DoorSpeed_SubSys</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
                 <file>
                     <name>$extsource$\ChibiOS\chibios203\os\various\shell\shell.c</name>
@@ -7770,6 +8926,7 @@
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
                     <configuration>DoorSpeed_SubSys</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
                 <file>
                     <name>$extsource$\ChibiOS\chibios203\os\various\wolfssl_bindings\hwrng.c</name>
@@ -7789,6 +8946,7 @@
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
                     <configuration>DoorSpeed_SubSys</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
             </file>
         </group>
@@ -7813,6 +8971,7 @@
                 <configuration>VSS_PORT</configuration>
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$PROJ_DIR$\include\VNODE\chconf.h</name>
@@ -7856,6 +9015,7 @@
             <configuration>VSS_PORT</configuration>
             <configuration>DoorSpeed_V2</configuration>
             <configuration>DoorSpeed_SubSys</configuration>
+            <configuration>VNODE_WIRELESS</configuration>
         </excluded>
         <group>
             <name>Master_v296</name>
@@ -7863,6 +9023,7 @@
                 <configuration>VSS_PORT</configuration>
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <group>
                 <name>ASCII</name>
@@ -8236,6 +9397,7 @@
                     <configuration>VSS_PORT</configuration>
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
                 <file>
                     <name>$extsource$\redpine\RS9116.NB0.WC.GENR.OSI.1.1.1\host\sapis\hal\sensorNode\rsi_hal_mcu_interrupt.c</name>
@@ -8271,6 +9433,7 @@
                     <configuration>VSS_PORT</configuration>
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
             </group>
             <group>
@@ -8305,6 +9468,7 @@
                         <configuration>VSS_PORT</configuration>
                         <configuration>VNODE_ST_Serial</configuration>
                         <configuration>DoorSpeed_V2</configuration>
+                        <configuration>VNODE_WIRELESS</configuration>
                     </excluded>
                 </file>
             </group>
@@ -8337,6 +9501,7 @@
                 <configuration>VSS_PORT</configuration>
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$extsource$\ylib\wireless\redpine\rsi_app_bt_spp_slave.c</name>
@@ -8361,6 +9526,7 @@
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
                     <configuration>DoorSpeed_SubSys</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
             </file>
             <file>
@@ -8400,9 +9566,11 @@
         <group>
             <name>doorSpeed_subsys</name>
             <excluded>
+                <configuration>Debug</configuration>
                 <configuration>VSS_PORT</configuration>
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$PROJ_DIR$\source\doorspeed\doorspeed_subsys_app.c</name>
@@ -8413,6 +9581,9 @@
             <file>
                 <name>$PROJ_DIR$\source\doorspeed\task_analog_input.h</name>
             </file>
+        </group>
+        <group>
+            <name>DSP</name>
         </group>
         <group>
             <name>Flash</name>
@@ -8428,6 +9599,7 @@
                     <configuration>VSS_PORT</configuration>
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
             </file>
             <file>
@@ -8447,6 +9619,7 @@
                     <configuration>VNODE_ST_Serial</configuration>
                     <configuration>DoorSpeed_V2</configuration>
                     <configuration>DoorSpeed_SubSys</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
             </file>
             <file>
@@ -8473,6 +9646,7 @@
                 <configuration>VSS_PORT</configuration>
                 <configuration>DoorSpeed_V2</configuration>
                 <configuration>DoorSpeed_SubSys</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$PROJ_DIR$\source\fmbPort\mbconfig.h</name>
@@ -8527,7 +9701,11 @@
                 <configuration>VSS_PORT</configuration>
                 <configuration>DoorSpeed_V2</configuration>
                 <configuration>DoorSpeed_SubSys</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
+            <file>
+                <name>$PROJ_DIR$\source\fft_window.c</name>
+            </file>
             <file>
                 <name>$PROJ_DIR$\source\vnode_serial\modbus_task.c</name>
             </file>
@@ -8545,6 +9723,7 @@
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
                 <configuration>DoorSpeed_SubSys</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
             <file>
                 <name>$PROJ_DIR$\source\main.c</name>
@@ -8577,7 +9756,14 @@
                 <name>$PROJ_DIR$\source\doorspeed\doorspeed_app.c</name>
                 <excluded>
                     <configuration>VSS_PORT</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
+            </file>
+            <file>
+                <name>$extsource$\ylib\protocol\hs_uart\hs_uart.c</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\protocol\hs_uart\hs_uart.h</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\source\VSS\task_storage.c</name>
@@ -8595,9 +9781,13 @@
                 <name>$PROJ_DIR$\source\VSS\task_wireless.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\source\VSS\vnode_app.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\source\VSS\vss_app.c</name>
                 <excluded>
                     <configuration>DoorSpeed_V2</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
             </file>
         </group>
@@ -8626,6 +9816,9 @@
             </file>
             <file>
                 <name>$extsource$\ylib\sensor\bmi160\bmi160.c</name>
+                <excluded>
+                    <configuration>Debug</configuration>
+                </excluded>
             </file>
             <file>
                 <name>$extsource$\ylib\sensor\bmi160\bmi160.h</name>
@@ -8635,6 +9828,20 @@
             </file>
             <file>
                 <name>$extsource$\ylib\sensor\bmi160\bmi160_dev.c</name>
+                <excluded>
+                    <configuration>Debug</configuration>
+                </excluded>
+            </file>
+            <file>
+                <name>$extsource$\ylib\numeric\frequency\cmsis_fft.c</name>
+                <excluded>
+                    <configuration>Debug</configuration>
+                    <configuration>VSS_PORT</configuration>
+                    <configuration>VNODE_WIRELESS</configuration>
+                </excluded>
+            </file>
+            <file>
+                <name>$extsource$\ylib\numeric\frequency\cmsis_fft.h</name>
             </file>
             <file>
                 <name>$extsource$\ylib\sensor\htud\htu2x.c</name>
@@ -8658,6 +9865,18 @@
                 <name>$extsource$\ylib\sensor\ntc\ntc.h</name>
             </file>
             <file>
+                <name>$extsource$\ylib\numeric\Filters\recursive.c</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\numeric\Filters\recursive.h</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\utility\st_chipid.c</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\utility\st_chipid.h</name>
+            </file>
+            <file>
                 <name>$extsource$\ylib\numeric\time\time_domain.c</name>
             </file>
             <file>
@@ -8676,6 +9895,7 @@
                 <configuration>VSS_PORT</configuration>
                 <configuration>VNODE_ST_Serial</configuration>
                 <configuration>DoorSpeed_V2</configuration>
+                <configuration>VNODE_WIRELESS</configuration>
             </excluded>
         </file>
         <file>

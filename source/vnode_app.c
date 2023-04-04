@@ -7,6 +7,7 @@
 #include "nvm_config.h"
 #include "usbcfg.h"
 #include "bootConfig.h"
+#include "ylib/utility/st_chipid.h"
 
 static struct{
   uint8_t flag;
@@ -37,8 +38,14 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xAF,0x00,0,0},cmd_boot},
   {{0xab,0xba,0xA4,0x00,0,0},cmd_idn},
   {{0xab,0xba,0x01,0x00,0,0},NULL},
+//  {NULL,NULL},
 };
 
+// LIR = 40000/4 = 10,000 Hz, reload 1000 -> 100ms
+static const WDGConfig wdgcfg = {
+  STM32_IWDG_PR_4,
+  STM32_IWDG_RL(1000)
+};
 static const BinShellConfig shell_cfg = {
   (BaseSequentialStream *)&SDU1,
   commands
@@ -267,7 +274,10 @@ static THD_FUNCTION(procOperation ,p)
                 header->pid = pktCount++;
                 header->chksum = checksum(runTime.buffer,header->len);
                 if(stream != NULL){
-                  streamWrite(stream,runTime.buffer, header->len);
+                  uint16_t n = streamWrite(stream,runTime.buffer, header->len);
+                  if(n != header->len){
+                    bStop = true;
+                  }
                   runTime.timeout = 0;
                 }
                 runTime.rxSz = CMD_STRUCT_SZ + 4;
@@ -462,15 +472,18 @@ static void keep_live(void *arg)
 static THD_WORKING_AREA(waMonitor,512);
 static THD_FUNCTION(procMonitor ,p)
 {
+  wdgStart(&WDGD1, &wdgcfg);
+
   while(1){
     if(runTime.opThread != NULL){
       runTime.timeout ++;
-      if(runTime.timeout > 10){
+      if(runTime.timeout > 40){
         stopTransfer();
       }
     }
-    
-    chThdSleepMilliseconds(200);
+    wdgReset(&WDGD1);
+
+    chThdSleepMilliseconds(50);
   }
   
 }
@@ -486,12 +499,21 @@ void vnode_app_init()
     adxl355_powerup(&adxl);
     adxl355_powerdown(&adxl);
   }
+  // read id
+  uint16_t uid = readChipId16();
+  uint8_t str[8];
+  chsnprintf(str,16,"%08d",uid);
+  
+  for(uint8_t i=0;i<8;i++){
+    vcom_string3[2 + i*2] = str[i];
+    vcom_string3[3 + i*2] = 0x0;
+  }  
   //runTime.shelltp = chThdCreateStatic(waShell, sizeof(waShell),NORMALPRIO+1,binshellProc,(void*)&shell_cfg);
   sduObjectInit(&SDU1);
   sduStart(&SDU1, &serusbcfg);
   usbDisconnectBus(serusbcfg.usbp);
 //  palClearPad(GPIOA,15);
-//  chThdSleepMilliseconds(1000);
+//  chThdSleepMilliseconds(50);
 //  palSetPad(GPIOA,15);
   usbStart(serusbcfg.usbp, &usbcfg);
   usbConnectBus(serusbcfg.usbp);  
@@ -499,7 +521,6 @@ void vnode_app_init()
 //  chVTObjectInit(&runTime.vt);
   runTime.monitorThread = chThdCreateStatic(waMonitor,sizeof(waMonitor),NORMALPRIO-1,procMonitor,NULL);
   
-
   while(1){
     if (SDU1.config->usbp->state == USB_ACTIVE) {
       /* Starting shells.*/
@@ -510,7 +531,7 @@ void vnode_app_init()
       }
 
       /* Waiting for an exit event then freeing terminated shells.*/
-      chEvtWaitAny(EVENT_MASK(0));
+      chEvtWaitAny(ALL_EVENTS);
       if (chThdTerminatedX(runTime.shelltp)) {
         chThdRelease(runTime.shelltp);
         runTime.shelltp = NULL;
@@ -673,17 +694,15 @@ void cmd_start(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
 }
 void cmd_stop(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
 {
-  if(runTime.opThread){
-    BinCommandHeader header;
-    header.magic1 = MAGIC1;
-    header.magic2 = MAGIC2;
-    header.type = MASK_CMD_RET_OK;
-    header.pid = 0;
-    header.len = CMD_STRUCT_SZ;
-    header.chksum = checksum((uint8_t*)&header,header.len);
-    streamWrite(chp,(uint8_t*)&header,8);
-    stopTransfer();
-  }
+  BinCommandHeader header;
+  header.magic1 = MAGIC1;
+  header.magic2 = MAGIC2;
+  header.type = MASK_CMD_RET_OK;
+  header.pid = 0;
+  header.len = CMD_STRUCT_SZ;
+  header.chksum = checksum((uint8_t*)&header,header.len);
+  streamWrite(chp,(uint8_t*)&header,8);
+  stopTransfer();
 }
 void cmd_read(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data)
 {
@@ -701,7 +720,7 @@ void cmd_boot(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
   // read remaining data
   if(header->len == (CMD_STRUCT_SZ + 4)){
     boot_info bootInfo;
-    bootInfo.loaderVersion = 0x0;
+    //bootInfo.loaderVersion = 0x0;
     streamRead(chp,&buffer[CMD_STRUCT_SZ],header->len - CMD_STRUCT_SZ);
     uint16_t crc = checksum(buffer,header->len);
     resp->len = CMD_STRUCT_SZ;
@@ -732,7 +751,7 @@ void cmd_idn(BaseSequentialStream *chp, BinCommandHeader *header, uint8_t *data)
 
   if(header->len == CMD_STRUCT_SZ){
     boot_info bootInfo;
-    bootInfo.loaderVersion = 0x0;
+    //bootInfo.loaderVersion = 0x0;
     uint16_t crc = checksum(buffer,header->len);
     //resp->len = CMD_STRUCT_SZ + sizeof(bootInfo);
     if(crc == header->chksum){

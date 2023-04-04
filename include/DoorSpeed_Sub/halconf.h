@@ -177,7 +177,7 @@
  * @brief   Enables the UART subsystem.
  */
 #if !defined(HAL_USE_UART) || defined(__DOXYGEN__)
-#define HAL_USE_UART                        TRUE
+#define HAL_USE_UART                        FALSE
 #endif
 
 /**
@@ -191,7 +191,7 @@
  * @brief   Enables the WDG subsystem.
  */
 #if !defined(HAL_USE_WDG) || defined(__DOXYGEN__)
-#define HAL_USE_WDG                         TRUE
+#define HAL_USE_WDG                         FALSE
 #endif
 
 /**

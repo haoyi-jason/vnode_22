@@ -324,7 +324,7 @@
                                          PIN_MODE_INPUT(GPIOA_BMI_INT2   )                   |\
                                      PIN_MODE_ALTERNATE(GPIOA_SWDIO    )            |\
                                      PIN_MODE_ALTERNATE(GPIOA_SWCLK    )            |\
-                                        PIN_MODE_INPUT(GPIOA_BMI_DRDY   ))
+                                        PIN_MODE_OUTPUT(GPIOA_BMI_DRDY   ))
 #define VAL_GPIOA_OTYPER            (PIN_OTYPE_PUSHPULL(GPIOA_UART2_CTS)        |\
                                      PIN_OTYPE_PUSHPULL(GPIOA_UART2_RTS)        |\
                                      PIN_OTYPE_PUSHPULL(GPIOA_UART2_TX )        |\
@@ -367,7 +367,7 @@
                                      PIN_PUPDR_PULLUP(GPIOA_SPI1_MOSI)         |\
                                      PIN_PUPDR_PULLUP(GPIOA_SPI2_CS )           |\
                                      PIN_PUPDR_FLOATING(GPIOA_UART1_TX )         |\
-                                     PIN_PUPDR_FLOATING(GPIOA_UART1_RX )         |\
+                                     PIN_PUPDR_PULLUP(GPIOA_UART1_RX )         |\
                                      PIN_PUPDR_FLOATING(GPIOA_BMI_INT1   )             |\
                                      PIN_PUPDR_FLOATING(GPIOA_BMI_INT2   )         |\
                                      PIN_PUPDR_PULLUP(GPIOA_SWDIO    )         |\
