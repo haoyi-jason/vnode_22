@@ -21,7 +21,7 @@
 
 #define EV_ADXL_FIFO_FULL       EVENT_MASK(0)
 #define EV_IMU_FIFO_FULL        EVENT_MASK(1)
-
+#define EV_EXEC_FFT             EVENT_MASK(2)
 
 struct _nvmParam{
   uint8_t flag;
@@ -67,6 +67,7 @@ struct _runTime{
   float bin_freq;
   float freq[5];
   float fft_bins[FFT_SAMPLE_NUMBER>>1];
+  bool fillFFT;
 };
 
 #define ADC_GRP1_NUM_CHANNELS   2
@@ -360,6 +361,7 @@ static THD_FUNCTION(procOperation ,p)
     scale = adxl.sensitivity;
     float rate = 4000./(1 << (adxl.config->outputrate));
     runTime.bin_freq = rate/(float)FFT_SAMPLE_NUMBER;
+    
   }
   else if(activeSensor == SENSOR_BMI160){
     chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
@@ -370,6 +372,10 @@ static THD_FUNCTION(procOperation ,p)
     runTime.time.scale.x = bmi160.lsb_accel;
     runTime.time.scale.y = bmi160.lsb_accel;
     runTime.time.scale.z = bmi160.lsb_accel;
+    scale = bmi160.lsb_accel;
+
+    float rate = 1600./(1 << (0x0c - bmi160.imu.accel_cfg.odr + 1));
+    runTime.bin_freq = rate/(float)FFT_SAMPLE_NUMBER;
   }
   else if(activeSensor == SENSOR_ISM330){
     chEvtRegisterMask(&ism330.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
@@ -398,6 +404,7 @@ static THD_FUNCTION(procOperation ,p)
   uint32_t fifo_size;
   eventmask_t evt;
   uint8_t ignorePacket = 1;
+  runTime.fillFFT = true;
   //runTime.rxSz = CMD_STRUCT_SZ + 4;
   while(!bStop){
     evt = chEvtWaitAny(ALL_EVENTS);
@@ -450,24 +457,53 @@ static THD_FUNCTION(procOperation ,p)
             }
           }
           // time domain
-//          if(feed_fifo32(&runTime.time,(uint8_t*)data,sz)==1){
-//            // update modbus data
-//            memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
-//            memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
-//            memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
-//            runTime.peak.x = (runTime.time.peak.x - runTime.time.peakn.x);
-//            runTime.peak.y = (runTime.time.peak.y - runTime.time.peakn.y);
-//            runTime.peak.z = (runTime.time.peak.z - runTime.time.peakn.z);
-//            resetObject(&runTime.time);
-//          }
+          if(feed_fifo32(&runTime.time,(uint8_t*)data,sz)==1){
+            // update modbus data
+            memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
+            memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
+            memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
+            runTime.peak.x = (runTime.time.peak.x - runTime.time.peakn.x);
+            runTime.peak.y = (runTime.time.peak.y - runTime.time.peakn.y);
+            runTime.peak.z = (runTime.time.peak.z - runTime.time.peakn.z);
+            resetObject(&runTime.time);
+          }
           
-          // FFT
-          fft_feed_fifo_adxl(&runTime.fft_data,(uint8_t*)data,sz,scale);
-          if(runTime.fft_data.newData == 1){
-            memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
-            runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
-            runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
-            runTime.fft_data.newData = 0;
+//          // FFT
+//          if(runTime.fillFFT){
+//            fft_feed_fifo_adxl(&runTime.fft_data,(uint8_t*)data,sz,scale);
+//            if(runTime.fft_data.newData == 1){
+//              memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+//              runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+//              runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
+//              runTime.fft_data.newData = 0;
+//              runTime.fillFFT = false;
+//            }
+//          }
+          break;
+        case OP_FNODE:
+          bsz = sz*9;
+          adxl355_read_fifo(&adxl,runTime.buffer,bsz); // each record has 9-bytes (x/y/z)*3
+          bsz = sz*4*3;
+          p_src = runTime.buffer;
+          p_dst = (uint8_t*)data;
+          p_dst += 3;
+          for(uint16_t j=0;j<bsz;j++){
+            if((j%4)==3){
+              *(p_dst--)=0;
+              p_dst = (uint8_t*)data + j + 4;
+            }else{
+              *(p_dst--)=*(p_src++);
+            }
+          }
+          if(runTime.fillFFT){
+            fft_feed_fifo_adxl(&runTime.fft_data,(uint8_t*)data,sz,scale);
+            if(runTime.fft_data.newData == 1){
+              memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+              runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+              runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
+              runTime.fft_data.newData = 0;
+              runTime.fillFFT = false;
+            }
           }
           break;
         }
@@ -590,10 +626,58 @@ static THD_FUNCTION(procOperation ,p)
 
               resetObject(&runTime.time);
             }
+//            fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
+//            if(runTime.fft_data.newData == 1){
+//              memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+//              runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+//              runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
+//              runTime.fft_data.newData = 0;
+//            }
           }
           //chSysUnlock();
         }
-        break;          
+        break; 
+      case OP_FNODE:
+        if(activeSensor == SENSOR_ISM330){
+          if(ism330_cmd_fifo_read(&ism330,runTime.buffer,300,&readSz)){
+            sz = readSz/12; // nof records
+            if(ignorePacket > 0){
+              ignorePacket--;
+              continue;
+            }
+            if(runTime.fillFFT){
+              fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
+              if(runTime.fft_data.newData == 1){
+                memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+                runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+                runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
+                runTime.fft_data.newData = 0;
+                runTime.fillFFT = false;
+              }
+            }
+          }
+        }
+        else if(activeSensor == SENSOR_BMI160){
+          //chSysLock();
+          if(bmi160_fifo_read(&bmi160,runTime.buffer,300,&readSz) == MSG_OK){
+            sz = readSz/12; // nof records
+            if(ignorePacket > 0){
+              ignorePacket--;
+              continue;
+            }
+            if(runTime.fillFFT){
+              fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
+              if(runTime.fft_data.newData == 1){
+                memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+                runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+                runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
+                runTime.fft_data.newData = 0;
+                runTime.fillFFT = false;
+              }
+            }
+          }
+        }
+        break;
       }
     }
     bStop = chThdShouldTerminateX();
@@ -664,7 +748,7 @@ void vnode_app_init()
   
   //nvmParam.nodeParam.activeSensor = SENSOR_BMI160;
 
-  nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
+  //nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
   if(nvmParam.nodeParam.activeSensor == SENSOR_ADXL355){
     memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
     
@@ -683,7 +767,7 @@ void vnode_app_init()
     }
   }
   
-  else if(nvmParam.nodeParam.activeSensor == SENSOR_BMI160){    
+  else if(nvmParam.nodeParam.activeSensor == SENSOR_BMI160){   
     if(bmi160_dev_init(&bmi160) == MSG_OK){
       runTime.sensorReady = SENSOR_BMI160;
     }
@@ -792,6 +876,11 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
       memcpy(dptr,sptr,4);
       ret = 2;
     }
+    else if(address == 198){
+      iv16 = nvmParam.nodeParam.opMode;
+      memcpy(dptr,(uint8_t *)&iv16,2);
+      ret = 1;
+    }
     else if(address == 199){
       iv16 = nvmParam.nodeParam.activeSensor;
       memcpy(dptr,(uint8_t *)&iv16,2);
@@ -886,7 +975,8 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
     else if(RANGE_CHECK(address,1021,1023)){
       if(address == 1021){
         iv16 = runTime.max_bin_index + 1024;
-        mapMBWord(dptr,(uint8_t*)&iv16);
+        memcpy(dptr,(uint8_t *)&iv16,2);
+        ret = 1;
       }
       else if(address == 1022){
         mapMBFloat(dptr,(uint8_t*)&runTime.freq[0]);
@@ -895,7 +985,7 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
       
     }
     else if(RANGE_CHECK(address,1024,3072)){
-      mapMBFloat(dptr,(uint8_t*)&runTime.fft_bins[address - 1024]);
+      mapMBFloat(dptr,(uint8_t*)&runTime.fft_bins[(address - 1024)>>1]);
       ret = 2;
     }
     else{
@@ -906,7 +996,14 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
   }
   else{
     uint8_t save = 0;
-    if(address == 199){
+    if(address == 198){
+      mapMBWord((uint8_t*)&iv16,dptr);
+      if((iv16 == OP_VNODE) || (iv16 == OP_FNODE)){
+        nvmParam.nodeParam.opMode = (uint8_t)iv16;
+        save = 1;
+      }
+    }
+    else if(address == 199){
       mapMBWord((uint8_t*)&iv16,dptr);
       if((iv16 & SENSOR_ADXL355) == SENSOR_ADXL355){
         nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
@@ -1040,6 +1137,14 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
       default:
         ret = 1;
         break;
+      }
+    }
+    else if(address == 1021){
+      mapMBWord((uint8_t*)&iv16,dptr);
+      if(iv16 == 0xAA){
+        if(!runTime.fillFFT){
+          runTime.fillFFT = true;
+        }
       }
     }
     else if(address == 299){

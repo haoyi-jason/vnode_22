@@ -12,11 +12,18 @@
 
 #elif defined(AT32F413Cx_MD)
 #define PAGE_SIZE (             uint16_t)0x400  // 1K page size
-//#define FLASH_START_ADDRESS     ((uint32_t)0x8007000) // page 30*1K
-#define FLASH_START_ADDRESS     ((uint32_t)0x800F000) // page 60*1K
+#define FLASH_START_ADDRESS     ((uint32_t)0x801F000) // page 60*1K
 #define FLASH_BASE_ADDRESS      ((uint32_t)0x8000000)
-#define FLASH_ALL_SIZE          (1024*64) // 64K
+#define FLASH_ALL_SIZE          (1024*128) // 64K
 #define USER_FLASH_BASE_PAGE    32
+
+#elif defined(AT32F413Cx_MD2)
+#define PAGE_SIZE (             uint16_t)0x400  // 1K page size
+#define FLASH_START_ADDRESS     ((uint32_t)0x801F000) // page 124*1K
+#define FLASH_BASE_ADDRESS      ((uint32_t)0x8000000)
+#define FLASH_ALL_SIZE          (1024*128) // 64K
+#define USER_FLASH_BASE_PAGE    32
+
 #elif defined(STM32F4xx)
 #define PAGE_SIZE (             uint16_t)0x400  // 1K page size
 //#define FLASH_START_ADDRESS     ((uint32_t)0x8007000) // page 30*1K

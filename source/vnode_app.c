@@ -72,6 +72,7 @@ struct {
   virtual_timer_t vt;
   uint32_t timeout;
   thread_t *monitorThread;
+  bool saveSetting;
 }runTime;
 
 static SPIConfig spicfg = {
@@ -110,6 +111,16 @@ const module_setting_t module_default = {
   "Grididea-AT32",
   "VSS-II" // supported config
 };
+
+void save_settings(uint8_t option)
+{
+  chSysLock();
+//  chSysDisable();
+    nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,sizeof(nvmParam));
+    chSysUnlock();
+  //  chSysEnable();
+}
+
 static void load_settings()
 {
   uint16_t nvmSz = sizeof(nvmParam);
@@ -131,18 +142,11 @@ static void load_settings()
     memcpy((uint8_t*)&nvmParam.moduleParam,(uint8_t*)&module_default, sizeof(module_setting_t));
     
     
-    nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
+    //nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
+    save_settings(0);
   }
 }
 
-void save_settings(uint8_t option)
-{
-  //chSysLock();
-//  chSysDisable();
-    nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,sizeof(nvmParam));
-    //chSysUnlock();
-  //  chSysEnable();
-}
 
 //void adxl_int_handler(void *arg)
 //{
@@ -469,21 +473,27 @@ static void keep_live(void *arg)
   runTime.timeout++;
   chSysUnlockFromISR();
 }
-static THD_WORKING_AREA(waMonitor,512);
+static THD_WORKING_AREA(waMonitor,1024);
 static THD_FUNCTION(procMonitor ,p)
 {
-  wdgStart(&WDGD1, &wdgcfg);
+  //wdgStart(&WDGD1, &wdgcfg);
 
   while(1){
     if(runTime.opThread != NULL){
       runTime.timeout ++;
-      if(runTime.timeout > 40){
+      if(runTime.timeout > 4){
         stopTransfer();
       }
     }
-    wdgReset(&WDGD1);
+    else {
+      if(runTime.saveSetting){
+        save_settings(0);
+        runTime.saveSetting = false;
+      }
+    }
+    //wdgReset(&WDGD1);
 
-    chThdSleepMilliseconds(50);
+    chThdSleepMilliseconds(500);
   }
   
 }
@@ -519,7 +529,8 @@ void vnode_app_init()
   usbConnectBus(serusbcfg.usbp);  
   
 //  chVTObjectInit(&runTime.vt);
-  runTime.monitorThread = chThdCreateStatic(waMonitor,sizeof(waMonitor),NORMALPRIO-1,procMonitor,NULL);
+  runTime.saveSetting = false;
+  runTime.monitorThread = chThdCreateStatic(waMonitor,sizeof(waMonitor),NORMALPRIO,procMonitor,NULL);
   
   while(1){
     if (SDU1.config->usbp->state == USB_ACTIVE) {
@@ -654,7 +665,8 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         resp->chksum = checksum(buffer,resp->len);
         // write response
         streamWrite(chp,buffer,resp->len);
-        save_settings(0);
+//        save_settings(0);
+        runTime.saveSetting = true;
       }
       else{
         

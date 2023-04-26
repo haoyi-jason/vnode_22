@@ -347,7 +347,7 @@
                     <name>CCIncludePath2</name>
                     <state>$PROJ_DIR$\</state>
                     <state>$PROJ_DIR$\board\vnode</state>
-                    <state>$PROJ_DIR$\include\vnode</state>
+                    <state>$PROJ_DIR$\include\vnode_usb</state>
                     <state>$PROJ_DIR$\source\at32_comm</state>
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\common\abstractions\cmsis_os</state>
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ext\ARM\CMSIS\Core\Include</state>
@@ -663,7 +663,7 @@
                     <name>AUserIncludes</name>
                     <state>$PROJ_DIR$\</state>
                     <state>$PROJ_DIR$\board\vnode</state>
-                    <state>$PROJ_DIR$\include\vnode</state>
+                    <state>$PROJ_DIR$\include\vnode_usb</state>
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\license</state>
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ports\ARMCMx</state>
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\common\startup\ARMCMx\devices\AT32F4xx</state>
@@ -6748,6 +6748,7 @@
                     <state>RSI_SAMPLE_HAL</state>
                     <state>RSI_SPI_INTERFACE</state>
                     <state>STM32F411xE</state>
+                    <state>VNODE</state>
                 </option>
                 <option>
                     <name>CCPreprocFile</name>
@@ -8996,6 +8997,18 @@
             </file>
         </group>
         <group>
+            <name>VNODE_USB</name>
+            <file>
+                <name>$PROJ_DIR$\include\vnode_usb\chconf.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\include\vnode_usb\halconf.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\include\vnode_usb\mcuconf.h</name>
+            </file>
+        </group>
+        <group>
             <name>VSS</name>
             <file>
                 <name>$PROJ_DIR$\include\VSS\chconf.h</name>
@@ -9782,6 +9795,9 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\source\VSS\vnode_app.c</name>
+                <excluded>
+                    <configuration>VSS_PORT</configuration>
+                </excluded>
             </file>
             <file>
                 <name>$PROJ_DIR$\source\VSS\vss_app.c</name>

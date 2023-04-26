@@ -12,9 +12,9 @@ void nvmFlashReadPage(uint8_t page, uint8_t *d)
 
 void nvmFlashWritePage(uint8_t page, uint8_t *d)
 {
-  chSysLock();
+  //chSysLock();
   flash_Write(FLASH_START_ADDRESS + page * PAGE_SIZE,(uint16_t*)d,PAGE_SIZE/2);
-  chSysUnlock();
+  //chSysUnlock();
 }
 
 msg_t nvm_flash_read(uint32_t offset, uint8_t *dptr, uint16_t sz)

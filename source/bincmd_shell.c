@@ -75,7 +75,7 @@ THD_FUNCTION(binshellProc,p)
   BinShellConfig *scfg = p;
   BaseSequentialStream *chp = scfg->sc_channel;
   const BinShellCommand *scp = scfg->sc_commands;
-  uint8_t header[8];
+  uint8_t header[16];
   while(!chThdShouldTerminateX()){
     if(shellGetCommand(scfg,header,8)){
       chThdSleepMilliseconds(10);
@@ -87,7 +87,7 @@ THD_FUNCTION(binshellProc,p)
   
   chSysLock();
   chEvtBroadcastI(&shell_terminated);
-  chSysUnlock();
+  //chSysUnlock();
   chThdExitS(MSG_OK);
 }
 

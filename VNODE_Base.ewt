@@ -9252,6 +9252,18 @@
             </file>
         </group>
         <group>
+            <name>VNODE_USB</name>
+            <file>
+                <name>$PROJ_DIR$\include\vnode_usb\chconf.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\include\vnode_usb\halconf.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\include\vnode_usb\mcuconf.h</name>
+            </file>
+        </group>
+        <group>
             <name>VSS</name>
             <file>
                 <name>$PROJ_DIR$\include\VSS\chconf.h</name>

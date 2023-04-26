@@ -19,7 +19,7 @@
 
 uint8_t global_buf[GLOBAL_BUFF_LEN] = {0};
 
-#define NVM_FLAG        0xC2
+#define NVM_FLAG        0xA2
 enum _state{
   STA_NOT_INIT,
   STA_INITIALIZING,
@@ -107,7 +107,12 @@ static void load_default()
   uint16_t nvmSz = sizeof(nvmParam);
   nvmParam.flag = NVM_FLAG;
   nvmParam.wlan.connectTimeout = 10;
+#if defined(VNODE)
+  memcpy(nvmParam.wlan.prefix1,"VNODE\0",6);
+#else
   memcpy(nvmParam.wlan.prefix1,"VSS-III\0",8);
+#endif
+
   memcpy(nvmParam.wlan.prefix2,"Grididea.com.tw\0",16);
   memcpy(nvmParam.wlan.passwd1,"53290921\0",9);
   memcpy(nvmParam.wlan.passwd2,"53290921\0",9);
@@ -1060,18 +1065,31 @@ int32_t task_wireless_init(uint8_t commType)
   
   load_settings();
   
+#if defined(VNODE)
+  palSetPadMode(GPIOA,9,PAL_MODE_INPUT); // INT
+  palSetPadMode(GPIOA,10,PAL_MODE_OUTPUT_PUSHPULL); // RST
+  palSetPadMode(GPIOA,11,PAL_MODE_INPUT); // 
+  palSetPadMode(GPIOA,12,PAL_MODE_INPUT); // 
+  palClearPad(GPIOA,11);
+  palClearPad(GPIOA,12);
+
+  // toggle reset
+  palClearPad(GPIOA,10);
+  chThdSleepMilliseconds(100);
+  palSetPad(GPIOA,10);
+#else
   palSetPadMode(GPIOA,2,PAL_MODE_INPUT); // INT
   palSetPadMode(GPIOA,3,PAL_MODE_OUTPUT_PUSHPULL); // RST
   palSetPadMode(GPIOA,0,PAL_MODE_INPUT); // 
   palSetPadMode(GPIOA,1,PAL_MODE_INPUT); // 
   palClearPad(GPIOA,0);
   palClearPad(GPIOA,1);
-  
+
   // toggle reset
   palClearPad(GPIOA,3);
   chThdSleepMilliseconds(100);
   palSetPad(GPIOA,3);
-  
+#endif  
   sdwObjectInit(&SDW1);
   
   status = rsi_driver_init(global_buf, GLOBAL_BUFF_LEN);
