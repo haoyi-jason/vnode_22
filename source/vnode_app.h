@@ -11,6 +11,10 @@
 #define COM_IF_BT       0x40
 #define COM_IF_WIFI     0x80
 
+#define VENDER_STR      "GRIDIDEA-"
+#define PRODUCT_NAME    "VNODE_V2-"
+#define FW_VERSION      "23042801"
+
 enum {
   OP_STREAM,
   OP_VNODE,

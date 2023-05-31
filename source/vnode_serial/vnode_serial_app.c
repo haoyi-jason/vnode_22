@@ -332,7 +332,6 @@ static THD_FUNCTION(procOperation ,p)
   uint8_t activeSensor = nvmParam.nodeParam.activeSensor;
     
   bool bStop = false;
-  
 //  time_domain_param_t *time = (time_domain_param_t*)buffer;
 //  runTime.timedomain.nofSamples = (uint16_t)(rate * time->samplePeriodMs/1000);
 //  runTime.timedomain.sampleTimesec = time->samplePeriodMs/1000.;
@@ -404,7 +403,7 @@ static THD_FUNCTION(procOperation ,p)
   uint32_t fifo_size;
   eventmask_t evt;
   uint8_t ignorePacket = 1;
-  runTime.fillFFT = true;
+  //runTime.fillFFT = true;
   //runTime.rxSz = CMD_STRUCT_SZ + 4;
   while(!bStop){
     evt = chEvtWaitAny(ALL_EVENTS);
@@ -728,6 +727,12 @@ static void startTransfer(BaseSequentialStream *stream)
   }
 }
 
+// LIR = 40000/4 = 10,000 Hz, reload 1000 -> 100ms
+static const WDGConfig wdgcfg = {
+  STM32_IWDG_PR_4,
+  STM32_IWDG_RL(1000)
+};
+
 void vnode_app_init()
 {
   app_nvmParam = &nvmParam;
@@ -791,8 +796,10 @@ void vnode_app_init()
   
 //  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(1));
   startTransfer(NULL);
+  wdgStart(&WDGD1, &wdgcfg);
   while(1){
-    eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_IMMEDIATE);
+    //eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_IMMEDIATE);
+    wdgReset(&WDGD1);
     chThdSleepMilliseconds(50);
   }
 }
@@ -800,19 +807,11 @@ void vnode_app_init()
 int main()
 {
   thread_t *shelltp1 = NULL;
+  RCC->CSR |= RCC_CSR_RMVF;
   halInit();
   chSysInit();
   
-  float32_t f_input_cmsis_dsp = 2;
-  float32_t f_result_cmsis_dsp;
-  
-  float f_input = 2;
-  float f_result;
-  
-  arm_sqrt_f32(f_input_cmsis_dsp,&f_result_cmsis_dsp);
-  f_result = sqrt(f_input);
-  
-  
+ 
   vnode_app_init();
 }
 

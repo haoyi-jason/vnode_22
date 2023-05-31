@@ -509,6 +509,25 @@ void vnode_app_init()
     adxl355_powerup(&adxl);
     adxl355_powerdown(&adxl);
   }
+  
+  // set version string
+  uint8_t base = 2;
+  for(uint8_t i=0;i<strlen(VENDER_STR);i++){
+    vcom_string2[base+i*2] = VENDER_STR[i];
+    vcom_string2[base+i*2 + 1] = 0x0;
+    base += 2;
+  }
+  for(uint8_t i=0;i<strlen(PRODUCT_NAME);i++){
+    vcom_string2[base+i*2] = PRODUCT_NAME[i];
+    vcom_string2[base+i*2 + 1] = 0x0;
+    base += 2;
+  }
+
+  for(uint8_t i=0;i<strlen(FW_VERSION);i++){
+    vcom_string2[2+i*2] = FW_VERSION[i];
+    vcom_string2[3+i*2] = 0x0;
+  }
+  
   // read id
   uint16_t uid = readChipId16();
   uint8_t str[8];
