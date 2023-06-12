@@ -313,7 +313,7 @@ static void blink_cb(void *arg)
   chSysUnlockFromISR();
 }
 
-static THD_WORKING_AREA(waOperation,8192);
+static THD_WORKING_AREA(waOperation,16384);
 static THD_FUNCTION(procOperation ,p)
 {
   BinCommandHeader *header;
@@ -343,7 +343,7 @@ static THD_FUNCTION(procOperation ,p)
   //eventflags_t flags;
 //  activeSensor = SENSOR_ISM330;
   //activeSensor = SENSOR_ADXL355;
-  float scale = 1.0;
+  static float scale = 1.0;
   runTime.bin_freq = 1.0;
   if(activeSensor == SENSOR_ADXL355){
     chEvtRegisterMask(&adxl.evsource,&runTime.el_sensor,EV_ADXL_FIFO_FULL);
@@ -359,22 +359,22 @@ static THD_FUNCTION(procOperation ,p)
     runTime.time.scale.z = adxl.sensitivity;
     scale = adxl.sensitivity;
     float rate = 4000./(1 << (adxl.config->outputrate));
-    runTime.bin_freq = rate/(float)FFT_SAMPLE_NUMBER;
+    runTime.bin_freq = rate/(float)(FFT_SAMPLE_NUMBER);
     
   }
   else if(activeSensor == SENSOR_BMI160){
-    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
 //    runTime.ledBlink.ms_on = 500;
 //    runTime.ledBlink.ms_off = 500;
     //bmi160_dev_init(&bmi160);
+
+    float rate = 1600./(1 << (0x0c - bmi160.imu.accel_cfg.odr + 1));
+    runTime.bin_freq = rate/(float)(FFT_SAMPLE_NUMBER);
+    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
     bmi160_start(&bmi160);
     runTime.time.scale.x = bmi160.lsb_accel;
     runTime.time.scale.y = bmi160.lsb_accel;
     runTime.time.scale.z = bmi160.lsb_accel;
     scale = bmi160.lsb_accel;
-
-    float rate = 1600./(1 << (0x0c - bmi160.imu.accel_cfg.odr + 1));
-    runTime.bin_freq = rate/(float)FFT_SAMPLE_NUMBER;
   }
   else if(activeSensor == SENSOR_ISM330){
     chEvtRegisterMask(&ism330.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
@@ -497,7 +497,7 @@ static THD_FUNCTION(procOperation ,p)
           if(runTime.fillFFT){
             fft_feed_fifo_adxl(&runTime.fft_data,(uint8_t*)data,sz,scale);
             if(runTime.fft_data.newData == 1){
-              memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+              memcpy(runTime.fft_bins,runTime.fft_data.zt, sizeof(float)*(FFT_SAMPLE_NUMBER));
               runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
               runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
               runTime.fft_data.newData = 0;
@@ -647,7 +647,7 @@ static THD_FUNCTION(procOperation ,p)
             if(runTime.fillFFT){
               fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
               if(runTime.fft_data.newData == 1){
-                memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+                memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER));
                 runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
                 runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
                 runTime.fft_data.newData = 0;
@@ -660,14 +660,14 @@ static THD_FUNCTION(procOperation ,p)
           //chSysLock();
           if(bmi160_fifo_read(&bmi160,runTime.buffer,300,&readSz) == MSG_OK){
             sz = readSz/12; // nof records
-            if(ignorePacket > 0){
-              ignorePacket--;
-              continue;
-            }
+            //if(ignorePacket > 0){
+            //  ignorePacket--;
+            //  continue;
+           // }
             if(runTime.fillFFT){
               fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
               if(runTime.fft_data.newData == 1){
-                memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+                memcpy(runTime.fft_bins,runTime.fft_data.zt, sizeof(float)*(FFT_SAMPLE_NUMBER));
                 runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
                 runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
                 runTime.fft_data.newData = 0;

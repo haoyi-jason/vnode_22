@@ -13,7 +13,7 @@
 
 #define VENDER_STR      "GRIDIDEA-"
 #define PRODUCT_NAME    "VNODE_V2-"
-#define FW_VERSION      "23042801"
+#define FW_VERSION      "23061201"
 
 enum {
   OP_STREAM,
