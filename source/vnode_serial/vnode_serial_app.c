@@ -837,10 +837,10 @@ static void mapMBWord(uint8_t *dptr, uint8_t *val)
 
 static void mapMBFloat(uint8_t *dptr, uint8_t *val)
 {
-  *(dptr+0) = *(val+1);
-  *(dptr+1) = *(val+0);
-  *(dptr+2) = *(val+3);
-  *(dptr+3) = *(val+2);
+  *(dptr+0) = *(val+0);
+  *(dptr+1) = *(val+1);
+  *(dptr+2) = *(val+2);
+  *(dptr+3) = *(val+3);
 }
 
 
