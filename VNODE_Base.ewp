@@ -9797,6 +9797,7 @@
                 <name>$PROJ_DIR$\source\VSS\vnode_app.c</name>
                 <excluded>
                     <configuration>VSS_PORT</configuration>
+                    <configuration>DoorSpeed_V2</configuration>
                 </excluded>
             </file>
             <file>
@@ -9814,6 +9815,12 @@
             </file>
             <file>
                 <name>$extsource$\ylib\adda\ad76xx\ad76_drv.h</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\adda\ads1x15\ads1015.c</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\adda\ads1x15\ads1015.h</name>
             </file>
             <file>
                 <name>$extsource$\ylib\sensor\adxl355\adxl355_defs.h</name>
@@ -9853,6 +9860,8 @@
                 <excluded>
                     <configuration>Debug</configuration>
                     <configuration>VSS_PORT</configuration>
+                    <configuration>DoorSpeed_V2</configuration>
+                    <configuration>DoorSpeed_SubSys</configuration>
                     <configuration>VNODE_WIRELESS</configuration>
                 </excluded>
             </file>

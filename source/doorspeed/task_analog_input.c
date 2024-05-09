@@ -22,7 +22,7 @@ static const SPIConfig spicfg_ad76 = {
   NULL,
   NULL,
   NULL,
-  SPI_CR1_BR_1 | SPI_CR1_CPOL | SPI_CR1_CPHA
+  SPI_CR1_BR_2 | SPI_CR1_CPOL | SPI_CR1_CPHA
 };
 
 static AD7606Config ad7606config = {
@@ -86,19 +86,36 @@ static THD_FUNCTION(procAD7606 ,p)
   ad7606_reset(runTime.ad7606);
   eventmask_t evt;
 //  ad7606_start_conv(runTime.ad7606,1);
+  
+  // this application not use drdy interrupt
+  uint8_t state = 0;
   while(!chThdShouldTerminateX()){
-    evt = chEvtWaitAny(ALL_EVENTS);
-    if(evt & EV_AD7606_RDY){
+    switch(state){
+    case 0:
+      ad7606_start_conv_poll(runTime.ad7606,3);
+      state++;
+      break;
+    case 1:
       ad7606_read_conversion(runTime.ad7606,2);
-      palClearPad(GPIOC,15);
+      state = 0;
+      break;
     }
-    if(evt & EV_AD7606_ACQ){
-      palSetPad(GPIOC,15);
-      ad7606_start_conv(runTime.ad7606,3);
-    }
+    chThdSleepMilliseconds(1);
+      
+      
+//    evt = chEvtWaitAny(ALL_EVENTS);
+//    if(evt & EV_AD7606_RDY){
+//      ad7606_read_conversion(runTime.ad7606,2);
+//      //palClearPad(GPIOC,15);
+//    }
+//    if(evt & EV_AD7606_ACQ){
+//      //palSetPad(GPIOC,15);
+//      ad7606_start_conv(runTime.ad7606,3);
+//    }
     
   }
-  
+  chVTReset(&runTime.vt7606);
+  chThdExit(MSG_OK);
   
 }
 
@@ -107,7 +124,7 @@ void analog_input_task_init()
   runTime.ad7606 = &ad7606;
   runTime.sampleIntervalms = 1;
   analogRuntime = &runTime;
-  runTime.thd_ad7606 = chThdCreateStatic(waAD7606,sizeof(waAD7606),NORMALPRIO,procAD7606,NULL);
+  runTime.thd_ad7606 = chThdCreateStatic(waAD7606,sizeof(waAD7606),NORMALPRIO+1,procAD7606,NULL);
 }
 
 int8_t analog_input_read(uint8_t channel, int32_t *data)

@@ -7449,7 +7449,7 @@
                 </option>
                 <option>
                     <name>MemFile</name>
-                    <state>$TOOLKIT_DIR$\CONFIG\debugger\ArteryTek\AT32F413xB.ddf</state>
+                    <state>$TOOLKIT_DIR$\CONFIG\debugger\ArteryTek\AT32F413x8.ddf</state>
                 </option>
                 <option>
                     <name>RunToEnable</name>
@@ -7517,7 +7517,7 @@
                 </option>
                 <option>
                     <name>FlashLoadersV3</name>
-                    <state>$TOOLKIT_DIR$\config\flashloader\ArteryTek\AT32F413\AT32F413CB\FlashAT32F413CB.board</state>
+                    <state>$TOOLKIT_DIR$\config\flashloader\ArteryTek\AT32F413\AT32F413C8\FlashAT32F413C8.board</state>
                 </option>
                 <option>
                     <name>OCImagesSuppressCheck1</name>
@@ -7697,7 +7697,7 @@
                 <option>
                     <name>CMSISDAPResetList</name>
                     <version>1</version>
-                    <state>9</state>
+                    <state>2</state>
                 </option>
                 <option>
                     <name>CMSISDAPHWResetDuration</name>
@@ -8970,7 +8970,7 @@
                 </option>
                 <option>
                     <name>OCDynDriverList</name>
-                    <state>JLINK_ID</state>
+                    <state>STLINK_ID</state>
                 </option>
                 <option>
                     <name>OCLastSavedByProductVersion</name>
@@ -9898,7 +9898,7 @@
                 </option>
                 <option>
                     <name>CCSTLinkInterfaceRadio</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
                 <option>
                     <name>CCSTLinkInterfaceCmdLine</name>
@@ -9911,7 +9911,7 @@
                 </option>
                 <option>
                     <name>CCCpuClockEdit</name>
-                    <state></state>
+                    <state>100.0</state>
                 </option>
                 <option>
                     <name>CCSwoClockAuto</name>

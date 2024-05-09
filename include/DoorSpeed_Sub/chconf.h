@@ -389,7 +389,7 @@
  * @note    The default is @p TRUE.
  */
 #if !defined(CH_CFG_USE_OBJ_FIFOS)
-#define CH_CFG_USE_OBJ_FIFOS                TRUE
+#define CH_CFG_USE_OBJ_FIFOS                FALSE
 #endif
 
 /**
@@ -556,7 +556,7 @@
  * @note    The default is @p FALSE.
  */
 #if !defined(CH_DBG_ENABLE_ASSERTS)
-#define CH_DBG_ENABLE_ASSERTS               FALSE
+#define CH_DBG_ENABLE_ASSERTS               TRUE
 #endif
 
 /**

@@ -45,7 +45,7 @@
 
 #define STM32_SW                            STM32_SW_PLL
 
-#define STM32_PLLSRC                        STM32_PLLSRC_HSE
+#define STM32_PLLSRC                        STM32_PLLSRC_HSI
 
 #define STM32_PLLM_VALUE                    9 // 2..64
 #define STM32_PLLN_VALUE                    16
@@ -226,7 +226,7 @@
 /*
  * USB driver system settings.
  */
-#define STM32_USB_USE_USB1                  TRUE
+#define STM32_USB_USE_USB1                  FALSE
 #define STM32_USB_LOW_POWER_ON_SUSPEND      FALSE
 #define STM32_USB_USB1_HP_IRQ_PRIORITY      13
 #define STM32_USB_USB1_LP_IRQ_PRIORITY      14

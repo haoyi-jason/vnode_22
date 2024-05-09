@@ -81,6 +81,7 @@ typedef struct {
   uint8_t sensorReady;
   thread_t *shelltp;
   virtual_timer_t vt;
+  virtual_timer_t vt_keep;
   uint32_t timeout;
   thread_t *monitorThread;
   uint16_t pollIntervalMs;
@@ -116,8 +117,8 @@ static _bmi160_config_t bmiConfig = {
   {0x0,BMI160_ACCEL_NORMAL_MODE,BMI160_ACCEL_RANGE_2G,0x0},
   {0x0,BMI160_GYRO_NORMAL_MODE,BMI160_GYRO_RANGE_2000_DPS,0x0},
   GPIOA,4,
-  GPIOA,2,
-  GPIOA,3
+  GPIOB,0,
+  GPIOB,1
 };
 
 static BMI160Driver bmi160 = {
@@ -140,7 +141,9 @@ static void load_settings()
     // error
     while(1);
   }
+  chSysLock();
   nvm_flash_read(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
+  chSysUnlock();
   if(nvmParam.flag != 0xAB){
     nvmParam.flag = 0xAB;
     nvmParam.nodeParam.activeSensor = SENSOR_ADXL355;
@@ -190,7 +193,7 @@ static void conversion_cb(void *arg)
   chSysUnlockFromISR();
 }
 
-static THD_WORKING_AREA(waBMIReader,512);
+static THD_WORKING_AREA(waBMIReader,1024);
 static THD_FUNCTION(procBMIReader ,p)
 {  
   if(bmi160_dev_init(&bmi160) == MSG_OK){
@@ -199,9 +202,9 @@ static THD_FUNCTION(procBMIReader ,p)
   memcpy((uint8_t*)&bmi160.imu.accel_cfg,(uint8_t*)&nvmParam.imuParam.accel,sizeof(nvmParam.imuParam.accel));
   memcpy((uint8_t*)&bmi160.imu.gyro_cfg,(uint8_t*)&nvmParam.imuParam.gyro,sizeof(nvmParam.imuParam.gyro));
   
-  
-  bmi160.imu.accel_cfg.odr = BMI160_ACCEL_ODR_1600HZ;
-  bmi160.imu.gyro_cfg.odr = BMI160_GYRO_ODR_1600HZ;
+  //202401 change odr (1600 to 800) to check
+  bmi160.imu.accel_cfg.odr = BMI160_ACCEL_ODR_800HZ;
+  bmi160.imu.gyro_cfg.odr = BMI160_GYRO_ODR_800HZ;
   
   bmi160_poweron(&bmi160);
   uint16_t READSZ;
@@ -229,7 +232,7 @@ uint16_t sin_x[15] = {
   -9945,-9510,-7431,-4067
 };
 
-static THD_WORKING_AREA(waOperation,1200);
+static THD_WORKING_AREA(waOperation,2048);
 static THD_FUNCTION(procOperation ,p)
 {
   BinCommandHeader *header;
@@ -270,6 +273,7 @@ static THD_FUNCTION(procOperation ,p)
   
   runTime.pat_offset = 0;
   // enable vout
+//  palClearPad(GPIOC,13);
   palSetPad(GPIOC,13);
   while(!bStop){
     if(chThdShouldTerminateX()){
@@ -299,9 +303,9 @@ static THD_FUNCTION(procOperation ,p)
     runTime.rxSz += 16;
     
 
-    palClearPad(GPIOC,14);
+    //palClearPad(GPIOC,14);
     if(runTime.rxSz >= 80){
-      palSetPad(GPIOC,14);
+      //palSetPad(GPIOC,14);
       if(stream != NULL){
         memcpy(runTime.buf2,runTime.buffer,runTime.rxSz);
 //        streamWrite(stream,runTime.buffer, runTime.rxSz);
@@ -315,7 +319,9 @@ static THD_FUNCTION(procOperation ,p)
     runTime.tm_start = chVTGetSystemTime();
    // flags = chEvtGetAndClearFlags(&elSensor);
   }
+//  palSetPad(GPIOC,13);
   palClearPad(GPIOC,13);
+  chVTReset(&runTime.vt);
   chThdExit((msg_t)0);
  // chEvtUnregister(&bmi160.evsource,&runTime.el_sensor);
 }
@@ -326,11 +332,11 @@ static void startTransfer(void)
   if(runTime.pollIntervalMs == 0)
     runTime.pollIntervalMs = 10;
   if(!runTime.opThread){
-    chSemReset(&runTime.sem,1);
+    //chSemReset(&runTime.sem,1);
     analog_input_set_sample_interval(runTime.pollIntervalMs);
     runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO-1,procOperation,&SD1);
     runTime.bmiThread = chThdCreateStatic(waBMIReader,sizeof(waBMIReader),NORMALPRIO-1,procBMIReader,NULL);
-    //chVTSet(&runTime.vt,TIME_MS2I(200),keep_live,NULL);
+    //chVTSet(&runTime.vt_keep,TIME_MS2I(200),keep_live,NULL);
     runTime.timeout = 0;
   }
 }
@@ -342,7 +348,7 @@ static void stopTransfer(void)
     chEvtSignal(runTime.opThread, EVENT_MASK(10));
     chThdWait(runTime.opThread);
     runTime.opThread = NULL;
-    chVTReset(&runTime.vt);
+    //chVTReset(&runTime.vt_keep);
     chThdTerminate(runTime.bmiThread);
     chThdWait(runTime.bmiThread);
     runTime.bmiThread = NULL;
@@ -351,15 +357,15 @@ static void stopTransfer(void)
 
 static void handshake_io_handler(void *arg)
 {
-  chSysLockFromISR();
-  chEvtSignalI(runTime.self,EV_START_TRIGGER);
-  chSysUnlockFromISR();
+  //chSysLockFromISR();
+  chEvtSignal(runTime.self,EV_START_TRIGGER);
+  //chSysUnlockFromISR();
 }
 
 static void keep_live(void *arg)
 {
   chSysLockFromISR();
-  chVTSetI(&runTime.vt, TIME_MS2I(200),keep_live,NULL);
+  chVTSetI(&runTime.vt_keep, TIME_MS2I(200),keep_live,NULL);
   runTime.timeout++;
   chSysUnlockFromISR();
 }
@@ -379,8 +385,8 @@ static THD_FUNCTION(procMonitor ,p)
   
 }
 //static THD_WORKING_AREA(waShell,2048);
-#define SHELL_WA_SIZE   1024
-static THD_WORKING_AREA(waShell, 1024);
+#define SHELL_WA_SIZE   2048
+static THD_WORKING_AREA(waShell, SHELL_WA_SIZE);
 void doorspeed_app_init()
 {
   load_settings();
@@ -395,7 +401,7 @@ void doorspeed_app_init()
 //  }
   sdStart(&SD1,&serialCfg);
   runTime.shelltp = chThdCreateStatic(waShell, sizeof(waShell),NORMALPRIO+1,binshellProc,(void*)&shell_cfg);
-//  chVTObjectInit(&runTime.vt);
+  //chVTObjectInit(&runTime.vt_keep);
 //  runTime.monitorThread = chThdCreateStatic(waMonitor,sizeof(waMonitor),NORMALPRIO-1,procMonitor,NULL);
 
   // register handshake io
@@ -406,6 +412,7 @@ void doorspeed_app_init()
   chSemObjectInit(&runTime.sem,0);
   
   runTime.usePattern = 0;
+//  palSetPad(GPIOC,13);
   palClearPad(GPIOC,13);
   //startTransfer();
   while(1){

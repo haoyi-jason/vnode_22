@@ -22,6 +22,12 @@
 #define EV_ADXL_FIFO_FULL       EVENT_MASK(0)
 #define EV_IMU_FIFO_FULL        EVENT_MASK(1)
 #define EV_EXEC_FFT             EVENT_MASK(2)
+#define EV_CALC_DONE            EVENT_MASK(3)
+
+#define NOF_SAMPLES             1024
+#define SAMPLE_BUFFER_SZ        6*2*1024
+#define SAMPLE_IMU              SAMPLE_BUFFER_SZ
+#define SAMPLE_ADXL             3*3*1024
 
 struct _nvmParam{
   uint8_t flag;
@@ -43,6 +49,7 @@ struct _nvmParam{
 struct _runTime{
   thread_t *self;
   thread_t *opThread;
+  thread_t *calThread;
   virtual_timer_t vt,blinker;
   uint8_t state;
   time_domain_t time;
@@ -50,6 +57,7 @@ struct _runTime{
   _float_3d hisRMS,hisPEAK;
   event_listener_t el_sensor;
   uint8_t buffer[320];
+  uint8_t sampleBuffer[SAMPLE_BUFFER_SZ];
   uint16_t rxSz;
   struct {
     uint16_t ms_on;
@@ -97,7 +105,7 @@ static const ADCConversionGroup adcgrpcfg = {
 };
 
 static struct _nvmParam nvmParam, *app_nvmParam;
-static struct _runTime runTime, *app_runTime;
+static struct _runTime ap_runTime, *app_runTime;
 static void blink_cb(void *arg);
 
 
@@ -286,34 +294,85 @@ static void blink_cb(void *arg)
 {
   chSysLockFromISR();
   
-  if(runTime.ledBlink.countDown == 0){
-    palSetPad(runTime.ledBlink.port, runTime.ledBlink.pad);
-    runTime.ledBlink.off_time = 0;
-    runTime.ledBlink.on_time =  0;
+  if(ap_runTime.ledBlink.countDown == 0){
+    palSetPad(ap_runTime.ledBlink.port, ap_runTime.ledBlink.pad);
+    ap_runTime.ledBlink.off_time = 0;
+    ap_runTime.ledBlink.on_time =  0;
   }
   else{
-    if(palReadPad(runTime.ledBlink.port, runTime.ledBlink.pad) == PAL_HIGH){
-      runTime.ledBlink.off_time +=100;
-      if(runTime.ledBlink.off_time >= runTime.ledBlink.ms_off){
-        palClearPad(runTime.ledBlink.port,runTime.ledBlink.pad);
-        runTime.ledBlink.on_time = 0;
+    if(palReadPad(ap_runTime.ledBlink.port, ap_runTime.ledBlink.pad) == PAL_HIGH){
+      ap_runTime.ledBlink.off_time +=100;
+      if(ap_runTime.ledBlink.off_time >= ap_runTime.ledBlink.ms_off){
+        palClearPad(ap_runTime.ledBlink.port,ap_runTime.ledBlink.pad);
+        ap_runTime.ledBlink.on_time = 0;
       }
     }
     else{
-      runTime.ledBlink.on_time +=100;
-      if(runTime.ledBlink.on_time >= runTime.ledBlink.ms_on){
-        palSetPad(runTime.ledBlink.port,runTime.ledBlink.pad);
-        runTime.ledBlink.off_time = 0;
+      ap_runTime.ledBlink.on_time +=100;
+      if(ap_runTime.ledBlink.on_time >= ap_runTime.ledBlink.ms_on){
+        palSetPad(ap_runTime.ledBlink.port,ap_runTime.ledBlink.pad);
+        ap_runTime.ledBlink.off_time = 0;
       }
     }
   }
-  if(runTime.ledBlink.countDown > 0)
-    runTime.ledBlink.countDown -= 100;
-  chVTSetI(&runTime.blinker,TIME_MS2I(100),blink_cb,NULL);
+  if(ap_runTime.ledBlink.countDown > 0)
+    ap_runTime.ledBlink.countDown -= 100;
+  chVTSetI(&ap_runTime.blinker,TIME_MS2I(100),blink_cb,NULL);
   chSysUnlockFromISR();
 }
 
-static THD_WORKING_AREA(waOperation,16384);
+
+static THD_WORKING_AREA(waCalc,512);
+static THD_FUNCTION(procCalc ,p)
+{
+  float scale = 1.0;
+  while(!chThdShouldTerminateX()){
+    eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_MS2I(10));
+    if(evt == 0x0) continue;
+    // time domain first
+    size_t sz = SAMPLE_BUFFER_SZ/12; // nof records
+    if(feed_fifo16_imu_hpf(&ap_runTime.time,(uint8_t*)ap_runTime.sampleBuffer,&ap_runTime.hpf,sz)==1){
+      memcpy((void*)&ap_runTime.rms,(void*)&ap_runTime.time.rms,12);
+      memcpy((void*)&ap_runTime.crest,(void*)&ap_runTime.time.crest,12);
+      memcpy((void*)&ap_runTime.velocity,(void*)&ap_runTime.time.velocity,12);
+      ap_runTime.peak.x = (int32_t)((ap_runTime.time.peak.x - ap_runTime.time.peakn.x)*1000);
+      ap_runTime.peak.y = (int32_t)((ap_runTime.time.peak.y - ap_runTime.time.peakn.y)*1000);
+      ap_runTime.peak.z = (int32_t)((ap_runTime.time.peak.z - ap_runTime.time.peakn.z)*1000);
+      ap_runTime.peak.x /= 1000;
+      ap_runTime.peak.y /= 1000;
+      ap_runTime.peak.z /= 1000;
+      
+      ap_runTime.rms.x = ((int32_t)(ap_runTime.rms.x * 1000));
+      ap_runTime.rms.y = ((int32_t)(ap_runTime.rms.y * 1000));
+      ap_runTime.rms.z = ((int32_t)(ap_runTime.rms.z * 1000));
+      ap_runTime.crest.x = ((int32_t)(ap_runTime.crest.x * 1000));
+      ap_runTime.crest.y = ((int32_t)(ap_runTime.crest.y * 1000));
+      ap_runTime.crest.z = ((int32_t)(ap_runTime.crest.z * 1000));
+      ap_runTime.velocity.x = ((int32_t)(ap_runTime.velocity.x * 1000));
+      ap_runTime.velocity.y = ((int32_t)(ap_runTime.velocity.y * 1000));
+      ap_runTime.velocity.z = ((int32_t)(ap_runTime.velocity.z * 1000));
+      ap_runTime.rms.x /= 1000;
+      ap_runTime.rms.y /= 1000;
+      ap_runTime.rms.z /= 1000;
+      ap_runTime.crest.x /= 1000;
+      ap_runTime.crest.y /= 1000;
+      ap_runTime.crest.z /= 1000;
+      ap_runTime.velocity.x /= 1000;
+      ap_runTime.velocity.y /= 1000;
+      ap_runTime.velocity.z /= 1000;
+      resetObject(&ap_runTime.time);
+    }
+
+      fft_feed_fifo_imu_hpf(&ap_runTime.fft_data,(uint8_t*)ap_runTime.sampleBuffer,sz,scale,&ap_runTime.hpf);
+      memcpy(ap_runTime.fft_bins,ap_runTime.fft_data.zt, sizeof(float)*(FFT_SAMPLE_NUMBER));
+      ap_runTime.max_bin_index = ap_runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+      ap_runTime.freq[0] = ap_runTime.max_bin_index*ap_runTime.bin_freq;
+      ap_runTime.fft_data.newData = 0;
+      
+      chEvtSignal(ap_runTime.opThread, EV_CALC_DONE);
+  }
+}
+static THD_WORKING_AREA(waOperation,1024);
 static THD_FUNCTION(procOperation ,p)
 {
   BinCommandHeader *header;
@@ -333,9 +392,9 @@ static THD_FUNCTION(procOperation ,p)
     
   bool bStop = false;
 //  time_domain_param_t *time = (time_domain_param_t*)buffer;
-//  runTime.timedomain.nofSamples = (uint16_t)(rate * time->samplePeriodMs/1000);
-//  runTime.timedomain.sampleTimesec = time->samplePeriodMs/1000.;
-//  runTime.timedomain.scale.x = runTime.timedomain.scale.y = runTime.timedomain.scale.z = dev->sensitivity;
+//  ap_runTime.timedomain.nofSamples = (uint16_t)(rate * time->samplePeriodMs/1000);
+//  ap_runTime.timedomain.sampleTimesec = time->samplePeriodMs/1000.;
+//  ap_runTime.timedomain.scale.x = ap_runTime.timedomain.scale.y = ap_runTime.timedomain.scale.z = dev->sensitivity;
 
 
 
@@ -344,71 +403,94 @@ static THD_FUNCTION(procOperation ,p)
 //  activeSensor = SENSOR_ISM330;
   //activeSensor = SENSOR_ADXL355;
   static float scale = 1.0;
-  runTime.bin_freq = 1.0;
+  ap_runTime.bin_freq = 1.0;
   if(activeSensor == SENSOR_ADXL355){
-    chEvtRegisterMask(&adxl.evsource,&runTime.el_sensor,EV_ADXL_FIFO_FULL);
-//    runTime.ledBlink.ms_on = 500;
-//    runTime.ledBlink.ms_off = 500;
+    chEvtRegisterMask(&adxl.evsource,&ap_runTime.el_sensor,EV_ADXL_FIFO_FULL);
+//    ap_runTime.ledBlink.ms_on = 500;
+//    ap_runTime.ledBlink.ms_off = 500;
     adxl355_get_fifo_size(&adxl,&sz);
     if(sz > 0){
       bStop = false;
     }
     adxl355_cmd_start(&adxl);  
-    runTime.time.scale.x = adxl.sensitivity;
-    runTime.time.scale.y = adxl.sensitivity;
-    runTime.time.scale.z = adxl.sensitivity;
+    ap_runTime.time.scale.x = adxl.sensitivity;
+    ap_runTime.time.scale.y = adxl.sensitivity;
+    ap_runTime.time.scale.z = adxl.sensitivity;
     scale = adxl.sensitivity;
     float rate = 4000./(1 << (adxl.config->outputrate));
-    runTime.bin_freq = rate/(float)(FFT_SAMPLE_NUMBER);
+    ap_runTime.bin_freq = rate/(float)(FFT_SAMPLE_NUMBER);
     
   }
   else if(activeSensor == SENSOR_BMI160){
-//    runTime.ledBlink.ms_on = 500;
-//    runTime.ledBlink.ms_off = 500;
+//    ap_runTime.ledBlink.ms_on = 500;
+//    ap_runTime.ledBlink.ms_off = 500;
     //bmi160_dev_init(&bmi160);
 
     float rate = 1600./(1 << (0x0c - bmi160.imu.accel_cfg.odr + 1));
-    runTime.bin_freq = rate/(float)(FFT_SAMPLE_NUMBER);
-    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
+    ap_runTime.bin_freq = rate/(float)(FFT_SAMPLE_NUMBER);
+    chEvtRegisterMask(&bmi160.evsource,&ap_runTime.el_sensor,EV_IMU_FIFO_FULL );
     bmi160_start(&bmi160);
-    runTime.time.scale.x = bmi160.lsb_accel;
-    runTime.time.scale.y = bmi160.lsb_accel;
-    runTime.time.scale.z = bmi160.lsb_accel;
+    ap_runTime.time.scale.x = bmi160.lsb_accel;
+    ap_runTime.time.scale.y = bmi160.lsb_accel;
+    ap_runTime.time.scale.z = bmi160.lsb_accel;
     scale = bmi160.lsb_accel;
   }
   else if(activeSensor == SENSOR_ISM330){
-    chEvtRegisterMask(&ism330.evsource,&runTime.el_sensor,EV_IMU_FIFO_FULL );
-//    runTime.ledBlink.ms_on = 500;
-//    runTime.ledBlink.ms_off = 500;
+    chEvtRegisterMask(&ism330.evsource,&ap_runTime.el_sensor,EV_IMU_FIFO_FULL );
+//    ap_runTime.ledBlink.ms_on = 500;
+//    ap_runTime.ledBlink.ms_off = 500;
     ism330_start(&ism330);
     
-    runTime.time.scale.x = ism330.lsb_accel;
-    runTime.time.scale.y = ism330.lsb_accel;
-    runTime.time.scale.z = ism330.lsb_accel;
+    ap_runTime.time.scale.x = ism330.lsb_accel;
+    ap_runTime.time.scale.y = ism330.lsb_accel;
+    ap_runTime.time.scale.z = ism330.lsb_accel;
   }
   
-  runTime.hpf.x.type = HPF;
-  runTime.hpf.y.type = HPF;
-  runTime.hpf.z.type = HPF;
-  recursive_set_single_pole(&runTime.hpf.x,0.95);
-  recursive_set_single_pole(&runTime.hpf.y,0.95);
-  recursive_set_single_pole(&runTime.hpf.z,0.95);
+  ap_runTime.hpf.x.type = HPF;
+  ap_runTime.hpf.y.type = HPF;
+  ap_runTime.hpf.z.type = HPF;
+  recursive_set_single_pole(&ap_runTime.hpf.x,0.95);
+  recursive_set_single_pole(&ap_runTime.hpf.y,0.95);
+  recursive_set_single_pole(&ap_runTime.hpf.z,0.95);
   
 //  uint8_t packetToIgnore = 5;
-//  if(runTime.resetBuffer != NULL){
-//    runTime.resetBuffer();
+//  if(ap_runTime.resetBuffer != NULL){
+//    ap_runTime.resetBuffer();
 //  }
-  //runTime.ledBlink.ms_off = 500;
-  //runTime.ledBlink.ms_on = 500;
-  uint32_t fifo_size;
+  //ap_runTime.ledBlink.ms_off = 500;
+  //ap_runTime.ledBlink.ms_on = 500;
+  static uint32_t fifo_size=0;
   eventmask_t evt;
   uint8_t ignorePacket = 1;
-  //runTime.fillFFT = true;
-  //runTime.rxSz = CMD_STRUCT_SZ + 4;
+  
+  //ap_runTime.fillFFT = true;
+  //ap_runTime.rxSz = CMD_STRUCT_SZ + 4;
   while(!bStop){
     evt = chEvtWaitAny(ALL_EVENTS);
    // flags = chEvtGetAndClearFlags(&elSensor);
     uint8_t *p_src, *p_dst;
+    
+//    if(evt == 0x0){
+//      uint16_t readSz;
+//          do{
+//            bmi160_fifo_read(&bmi160,ap_runTime.buffer,300,&readSz);
+//            if(readSz > 0){
+//              if(fifo_size < SAMPLE_BUFFER_SZ){
+//                size_t sz = ((SAMPLE_BUFFER_SZ - fifo_size)>readSz)?readSz:(SAMPLE_BUFFER_SZ - fifo_size);
+//                memcpy(&ap_runTime.sampleBuffer[fifo_size],ap_runTime.buffer,sz);
+//                fifo_size += sz;
+//                if(fifo_size == SAMPLE_BUFFER_SZ){
+//                  //chEvtSignal(ap_runTime.calThread, 0x01);
+//                  readSz = 0;
+//                }
+//              }
+//            }
+//          }while(readSz != 0);
+//    }
+    
+    if(evt & EV_CALC_DONE){
+      fifo_size = 0;
+    }
     if(evt & EV_ADXL_FIFO_FULL){ // adxl int1, fifo full
       adxl355_get_status(&adxl,&adxl_sta);
       if((adxl_sta & 0x02) == 0x00) continue;
@@ -422,29 +504,29 @@ static THD_FUNCTION(procOperation ,p)
         case OP_STREAM:
           bsz = sz*9; // read x/y/z combo
           if(bsz >= 144){
-            adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],144); // each record has 9-bytes (x/y/z)*3
-            runTime.rxSz += 144;
-            if(runTime.rxSz > 270){                
-                header = (BinCommandHeader*)runTime.buffer;
+            adxl355_read_fifo(&adxl,&ap_runTime.buffer[ap_runTime.rxSz],144); // each record has 9-bytes (x/y/z)*3
+            ap_runTime.rxSz += 144;
+            if(ap_runTime.rxSz > 270){                
+                header = (BinCommandHeader*)ap_runTime.buffer;
                 header->magic1 = MAGIC1;
                 header->magic2 = MAGIC2;
-                header->type = MASK_DATA ;//| runTime.lbt;
+                header->type = MASK_DATA ;//| ap_runTime.lbt;
                 header->len = 288 + CMD_STRUCT_SZ + 4;
                 header->pid = pktCount++;
-                header->chksum = checksum(runTime.buffer,header->len);
+                header->chksum = checksum(ap_runTime.buffer,header->len);
                 if(stream != NULL){
-                  streamWrite(stream,runTime.buffer, header->len);
+                  streamWrite(stream,ap_runTime.buffer, header->len);
                 }
-                runTime.rxSz = CMD_STRUCT_SZ + 4;
+                ap_runTime.rxSz = CMD_STRUCT_SZ + 4;
               }
           }
           break;
         case OP_VNODE:
         case OP_OLED:
           bsz = sz*9;
-          adxl355_read_fifo(&adxl,runTime.buffer,bsz); // each record has 9-bytes (x/y/z)*3
+          adxl355_read_fifo(&adxl,ap_runTime.buffer,bsz); // each record has 9-bytes (x/y/z)*3
           bsz = sz*4*3;
-          p_src = runTime.buffer;
+          p_src = ap_runTime.buffer;
           p_dst = (uint8_t*)data;
           p_dst += 3;
           for(uint16_t j=0;j<bsz;j++){
@@ -456,34 +538,34 @@ static THD_FUNCTION(procOperation ,p)
             }
           }
           // time domain
-          if(feed_fifo32(&runTime.time,(uint8_t*)data,sz)==1){
+          if(feed_fifo32(&ap_runTime.time,(uint8_t*)data,sz)==1){
             // update modbus data
-            memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
-            memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
-            memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
-            runTime.peak.x = (runTime.time.peak.x - runTime.time.peakn.x);
-            runTime.peak.y = (runTime.time.peak.y - runTime.time.peakn.y);
-            runTime.peak.z = (runTime.time.peak.z - runTime.time.peakn.z);
-            resetObject(&runTime.time);
+            memcpy((void*)&ap_runTime.rms,(void*)&ap_runTime.time.rms,12);
+            memcpy((void*)&ap_runTime.crest,(void*)&ap_runTime.time.crest,12);
+            memcpy((void*)&ap_runTime.velocity,(void*)&ap_runTime.time.velocity,12);
+            ap_runTime.peak.x = (ap_runTime.time.peak.x - ap_runTime.time.peakn.x);
+            ap_runTime.peak.y = (ap_runTime.time.peak.y - ap_runTime.time.peakn.y);
+            ap_runTime.peak.z = (ap_runTime.time.peak.z - ap_runTime.time.peakn.z);
+            resetObject(&ap_runTime.time);
           }
           
 //          // FFT
-//          if(runTime.fillFFT){
-//            fft_feed_fifo_adxl(&runTime.fft_data,(uint8_t*)data,sz,scale);
-//            if(runTime.fft_data.newData == 1){
-//              memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
-//              runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
-//              runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
-//              runTime.fft_data.newData = 0;
-//              runTime.fillFFT = false;
+//          if(ap_runTime.fillFFT){
+//            fft_feed_fifo_adxl(&ap_runTime.fft_data,(uint8_t*)data,sz,scale);
+//            if(ap_runTime.fft_data.newData == 1){
+//              memcpy(ap_runTime.fft_bins,ap_runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+//              ap_runTime.max_bin_index = ap_runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+//              ap_runTime.freq[0] = ap_runTime.max_bin_index*ap_runTime.bin_freq;
+//              ap_runTime.fft_data.newData = 0;
+//              ap_runTime.fillFFT = false;
 //            }
 //          }
           break;
         case OP_FNODE:
           bsz = sz*9;
-          adxl355_read_fifo(&adxl,runTime.buffer,bsz); // each record has 9-bytes (x/y/z)*3
+          adxl355_read_fifo(&adxl,ap_runTime.buffer,bsz); // each record has 9-bytes (x/y/z)*3
           bsz = sz*4*3;
-          p_src = runTime.buffer;
+          p_src = ap_runTime.buffer;
           p_dst = (uint8_t*)data;
           p_dst += 3;
           for(uint16_t j=0;j<bsz;j++){
@@ -494,14 +576,14 @@ static THD_FUNCTION(procOperation ,p)
               *(p_dst--)=*(p_src++);
             }
           }
-          if(runTime.fillFFT){
-            fft_feed_fifo_adxl(&runTime.fft_data,(uint8_t*)data,sz,scale);
-            if(runTime.fft_data.newData == 1){
-              memcpy(runTime.fft_bins,runTime.fft_data.zt, sizeof(float)*(FFT_SAMPLE_NUMBER));
-              runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
-              runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
-              runTime.fft_data.newData = 0;
-              runTime.fillFFT = false;
+          if(ap_runTime.fillFFT){
+            fft_feed_fifo_adxl(&ap_runTime.fft_data,(uint8_t*)data,sz,scale);
+            if(ap_runTime.fft_data.newData == 1){
+              memcpy(ap_runTime.fft_bins,ap_runTime.fft_data.zt, sizeof(float)*(FFT_SAMPLE_NUMBER));
+              ap_runTime.max_bin_index = ap_runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+              ap_runTime.freq[0] = ap_runTime.max_bin_index*ap_runTime.bin_freq;
+              ap_runTime.fft_data.newData = 0;
+              ap_runTime.fillFFT = false;
             }
           }
           break;
@@ -516,51 +598,51 @@ static THD_FUNCTION(procOperation ,p)
       
       switch(opMode){
       case OP_STREAM:
-        if(ism330_cmd_fifo_read(&ism330,&runTime.buffer[CMD_STRUCT_SZ],300,&readSz)){
-          //runTime.RxSz = readSz+CMD_STRUCT_SZ;
-          header = (BinCommandHeader*)runTime.buffer;
+        if(ism330_cmd_fifo_read(&ism330,&ap_runTime.buffer[CMD_STRUCT_SZ],300,&readSz)){
+          //ap_runTime.RxSz = readSz+CMD_STRUCT_SZ;
+          header = (BinCommandHeader*)ap_runTime.buffer;
           header->magic1 = MAGIC1;
           header->magic2 = MAGIC2;
-          header->type = MASK_DATA;// | runTime.lbt;
+          header->type = MASK_DATA;// | ap_runTime.lbt;
           header->len = 300 + CMD_STRUCT_SZ;
           header->pid = pktCount++;
-          header->chksum = checksum(runTime.buffer,header->len);
+          header->chksum = checksum(ap_runTime.buffer,header->len);
           if(stream != NULL){
-            streamWrite(stream,runTime.buffer, header->len);
+            streamWrite(stream,ap_runTime.buffer, header->len);
           }
         }
         break;
       case OP_VNODE:
       case OP_OLED:
         if(activeSensor == SENSOR_ISM330){
-          if(ism330_cmd_fifo_read(&ism330,runTime.buffer,300,&readSz)){
+          if(ism330_cmd_fifo_read(&ism330,ap_runTime.buffer,300,&readSz)){
             sz = readSz/12; // nof records
             if(ignorePacket > 0){
               ignorePacket--;
               continue;
             }
-            if(feed_fifo16_imu(&runTime.time,(uint8_t*)runTime.buffer,sz)==1){
-              memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
-              memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
-              memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
-              runTime.peak.x = (int32_t)((runTime.time.peak.x - runTime.time.peakn.x)*1000);
-              runTime.peak.y = (int32_t)((runTime.time.peak.y - runTime.time.peakn.y)*1000);
-              runTime.peak.z = (int32_t)((runTime.time.peak.z - runTime.time.peakn.z)*1000);
-              runTime.peak.x /= 1000;
-              runTime.peak.y /= 1000;
-              runTime.peak.z /= 1000;
+            if(feed_fifo16_imu(&ap_runTime.time,(uint8_t*)ap_runTime.buffer,sz)==1){
+              memcpy((void*)&ap_runTime.rms,(void*)&ap_runTime.time.rms,12);
+              memcpy((void*)&ap_runTime.crest,(void*)&ap_runTime.time.crest,12);
+              memcpy((void*)&ap_runTime.velocity,(void*)&ap_runTime.time.velocity,12);
+              ap_runTime.peak.x = (int32_t)((ap_runTime.time.peak.x - ap_runTime.time.peakn.x)*1000);
+              ap_runTime.peak.y = (int32_t)((ap_runTime.time.peak.y - ap_runTime.time.peakn.y)*1000);
+              ap_runTime.peak.z = (int32_t)((ap_runTime.time.peak.z - ap_runTime.time.peakn.z)*1000);
+              ap_runTime.peak.x /= 1000;
+              ap_runTime.peak.y /= 1000;
+              ap_runTime.peak.z /= 1000;
               
-              runTime.rms.x = (int32_t)(runTime.rms.x * 1000)/1000;
-              runTime.rms.y = (int32_t)(runTime.rms.y * 1000)/1000;
-              runTime.rms.z = (int32_t)(runTime.rms.z * 1000)/1000;
-              runTime.crest.x = (int32_t)(runTime.crest.x * 1000)/1000;
-              runTime.crest.y = (int32_t)(runTime.crest.y * 1000)/1000;
-              runTime.crest.z = (int32_t)(runTime.crest.z * 1000)/1000;
-              runTime.velocity.x = (int32_t)(runTime.velocity.x * 1000)/1000;
-              runTime.velocity.y = (int32_t)(runTime.velocity.y * 1000)/1000;
-              runTime.velocity.z = (int32_t)(runTime.velocity.z * 1000)/1000;
+              ap_runTime.rms.x = (int32_t)(ap_runTime.rms.x * 1000)/1000;
+              ap_runTime.rms.y = (int32_t)(ap_runTime.rms.y * 1000)/1000;
+              ap_runTime.rms.z = (int32_t)(ap_runTime.rms.z * 1000)/1000;
+              ap_runTime.crest.x = (int32_t)(ap_runTime.crest.x * 1000)/1000;
+              ap_runTime.crest.y = (int32_t)(ap_runTime.crest.y * 1000)/1000;
+              ap_runTime.crest.z = (int32_t)(ap_runTime.crest.z * 1000)/1000;
+              ap_runTime.velocity.x = (int32_t)(ap_runTime.velocity.x * 1000)/1000;
+              ap_runTime.velocity.y = (int32_t)(ap_runTime.velocity.y * 1000)/1000;
+              ap_runTime.velocity.z = (int32_t)(ap_runTime.velocity.z * 1000)/1000;
               
-              resetObject(&runTime.time);
+              resetObject(&ap_runTime.time);
               // send data via WIFI/BT
   //            header = (cmd_header_t*)buf;
   //            header->magic1 = MAGIC1;
@@ -568,69 +650,40 @@ static THD_FUNCTION(procOperation ,p)
   //            header->type = MASK_DATA;
   //            header->pid = pktCount++;
   //            uint8_t *ptr = &buf[CMD_STRUCT_SZ];
-  //            memcpy(ptr,&runTime.peak,12);
+  //            memcpy(ptr,&ap_runTime.peak,12);
   //            ptr += 12;
-  //            memcpy(ptr,&runTime.rms,12);
+  //            memcpy(ptr,&ap_runTime.rms,12);
   //            ptr += 12;
-  //            memcpy(ptr,&runTime.crest,12);
+  //            memcpy(ptr,&ap_runTime.crest,12);
   //            ptr += 12;
-  //            memcpy(ptr,&runTime.velocity,12);
+  //            memcpy(ptr,&ap_runTime.velocity,12);
   //            ptr += 12;
   //            header->len = 48 + CMD_STRUCT_SZ;
   //            header->chksum = cmd_checksum(buf,header->len);
   //            if(stream != NULL){
-  //              streamWrite(stream,runTime.buffer,header->len);
+  //              streamWrite(stream,ap_runTime.buffer,header->len);
   //            }
             }
           }
         }
         else if(activeSensor == SENSOR_BMI160){
           //chSysLock();
-          if(bmi160_fifo_read(&bmi160,runTime.buffer,300,&readSz) == MSG_OK){
-            sz = readSz/12; // nof records
-            if(ignorePacket > 0){
-              ignorePacket--;
-              continue;
+          if(bmi160_fifo_read(&bmi160,ap_runTime.buffer,300,&readSz) == MSG_OK){
+            if(fifo_size < SAMPLE_BUFFER_SZ){
+              size_t sz = ((SAMPLE_BUFFER_SZ - fifo_size)>readSz)?readSz:(SAMPLE_BUFFER_SZ - fifo_size);
+              memcpy(&ap_runTime.sampleBuffer[fifo_size],ap_runTime.buffer,sz);
+              fifo_size += sz;
+              if(fifo_size == SAMPLE_BUFFER_SZ){
+               // chEvtSignal(ap_runTime.calThread, 0x01);
+              }
             }
-            if(feed_fifo16_imu_hpf(&runTime.time,(uint8_t*)runTime.buffer,&runTime.hpf,sz)==1){
-              memcpy((void*)&runTime.rms,(void*)&runTime.time.rms,12);
-              memcpy((void*)&runTime.crest,(void*)&runTime.time.crest,12);
-              memcpy((void*)&runTime.velocity,(void*)&runTime.time.velocity,12);
-              runTime.peak.x = (int32_t)((runTime.time.peak.x - runTime.time.peakn.x)*1000);
-              runTime.peak.y = (int32_t)((runTime.time.peak.y - runTime.time.peakn.y)*1000);
-              runTime.peak.z = (int32_t)((runTime.time.peak.z - runTime.time.peakn.z)*1000);
-              runTime.peak.x /= 1000;
-              runTime.peak.y /= 1000;
-              runTime.peak.z /= 1000;
-              
-              runTime.rms.x = ((int32_t)(runTime.rms.x * 1000));
-              runTime.rms.y = ((int32_t)(runTime.rms.y * 1000));
-              runTime.rms.z = ((int32_t)(runTime.rms.z * 1000));
-              runTime.crest.x = ((int32_t)(runTime.crest.x * 1000));
-              runTime.crest.y = ((int32_t)(runTime.crest.y * 1000));
-              runTime.crest.z = ((int32_t)(runTime.crest.z * 1000));
-              runTime.velocity.x = ((int32_t)(runTime.velocity.x * 1000));
-              runTime.velocity.y = ((int32_t)(runTime.velocity.y * 1000));
-              runTime.velocity.z = ((int32_t)(runTime.velocity.z * 1000));
-              runTime.rms.x /= 1000;
-              runTime.rms.y /= 1000;
-              runTime.rms.z /= 1000;
-              runTime.crest.x /= 1000;
-              runTime.crest.y /= 1000;
-              runTime.crest.z /= 1000;
-              runTime.velocity.x /= 1000;
-              runTime.velocity.y /= 1000;
-              runTime.velocity.z /= 1000;
 
-
-              resetObject(&runTime.time);
-            }
-//            fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
-//            if(runTime.fft_data.newData == 1){
-//              memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
-//              runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
-//              runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
-//              runTime.fft_data.newData = 0;
+//            fft_feed_fifo_imu(&ap_runTime.fft_data,(uint8_t*)ap_runTime.buffer,sz,scale);
+//            if(ap_runTime.fft_data.newData == 1){
+//              memcpy(ap_runTime.fft_bins,ap_runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER>>1));
+//              ap_runTime.max_bin_index = ap_runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+//              ap_runTime.freq[0] = ap_runTime.max_bin_index*ap_runTime.bin_freq;
+//              ap_runTime.fft_data.newData = 0;
 //            }
           }
           //chSysUnlock();
@@ -638,43 +691,43 @@ static THD_FUNCTION(procOperation ,p)
         break; 
       case OP_FNODE:
         if(activeSensor == SENSOR_ISM330){
-          if(ism330_cmd_fifo_read(&ism330,runTime.buffer,300,&readSz)){
+          if(ism330_cmd_fifo_read(&ism330,ap_runTime.buffer,300,&readSz)){
             sz = readSz/12; // nof records
             if(ignorePacket > 0){
               ignorePacket--;
               continue;
             }
-            if(runTime.fillFFT){
-              fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
-              if(runTime.fft_data.newData == 1){
-                memcpy(runTime.fft_bins,runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER));
-                runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
-                runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
-                runTime.fft_data.newData = 0;
-                runTime.fillFFT = false;
+            if(ap_runTime.fillFFT){
+              //fft_feed_fifo_imu(&ap_runTime.fft_data,(uint8_t*)ap_runTime.buffer,sz,scale);
+              if(ap_runTime.fft_data.newData == 1){
+                memcpy(ap_runTime.fft_bins,ap_runTime.fft_data.zf, sizeof(float)*(FFT_SAMPLE_NUMBER));
+                ap_runTime.max_bin_index = ap_runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
+                ap_runTime.freq[0] = ap_runTime.max_bin_index*ap_runTime.bin_freq;
+                ap_runTime.fft_data.newData = 0;
+                ap_runTime.fillFFT = false;
               }
             }
           }
         }
         else if(activeSensor == SENSOR_BMI160){
           //chSysLock();
-          if(bmi160_fifo_read(&bmi160,runTime.buffer,300,&readSz) == MSG_OK){
-            sz = readSz/12; // nof records
-            //if(ignorePacket > 0){
-            //  ignorePacket--;
-            //  continue;
-           // }
-            if(runTime.fillFFT){
-              fft_feed_fifo_imu(&runTime.fft_data,(uint8_t*)runTime.buffer,sz,scale);
-              if(runTime.fft_data.newData == 1){
-                memcpy(runTime.fft_bins,runTime.fft_data.zt, sizeof(float)*(FFT_SAMPLE_NUMBER));
-                runTime.max_bin_index = runTime.fft_data.maxIndex+1; // +1 is for calculate right frequency
-                runTime.freq[0] = runTime.max_bin_index*runTime.bin_freq;
-                runTime.fft_data.newData = 0;
-                runTime.fillFFT = false;
+          do{
+            bmi160_fifo_read(&bmi160,ap_runTime.buffer,300,&readSz);
+            if(readSz > 0){
+              if(fifo_size < SAMPLE_BUFFER_SZ){
+                size_t sz = ((SAMPLE_BUFFER_SZ - fifo_size)>readSz)?readSz:(SAMPLE_BUFFER_SZ - fifo_size);
+                memcpy(&ap_runTime.sampleBuffer[fifo_size],ap_runTime.buffer,sz);
+                fifo_size += sz;
+                if(fifo_size == SAMPLE_BUFFER_SZ){
+                  chEvtSignal(ap_runTime.calThread, 0x01);
+//                  readSz = 0;
+                }
               }
             }
-          }
+            else if(readSz == 0){
+              readSz = 0;
+            }
+          }while(readSz != 0);
         }
         break;
       }
@@ -684,43 +737,48 @@ static THD_FUNCTION(procOperation ,p)
       if(activeSensor == SENSOR_ADXL355){
         adxl355_cmd_stop(&adxl);  
         // disable interrupt
-        runTime.ledBlink.ms_on = 500;
-        runTime.ledBlink.ms_off = 500;
-        //chEvtUnregister(&runTime.es_sensor,&elSensor);
+        ap_runTime.ledBlink.ms_on = 500;
+        ap_runTime.ledBlink.ms_off = 500;
+        //chEvtUnregister(&ap_runTime.es_sensor,&elSensor);
       }
       else if(activeSensor == SENSOR_ISM330){
         //palDisableLineEvent(LINE_ISM_INT);
         //ism330_cmd_stop_config();
-        //chEvtUnregister(&runTime.es_sensor,&elSensor);
+        //chEvtUnregister(&ap_runTime.es_sensor,&elSensor);
       }
-      runTime.ledBlink.ms_on = 1000;
-      runTime.ledBlink.ms_off = 1000;
+      ap_runTime.ledBlink.ms_on = 1000;
+      ap_runTime.ledBlink.ms_off = 1000;
     }
   }
 //  chThdExit((msg_t)0);
-    chEvtUnregister(&adxl.evsource,&runTime.el_sensor);
+    chEvtUnregister(&adxl.evsource,&ap_runTime.el_sensor);
   // turn off led
   palClearPad(GPIOC,3);
 }
 
 static void stopTransfer(void)
 {
-  if(runTime.opThread){
-    chThdTerminate(runTime.opThread);
-    chThdWait(runTime.opThread);
-    runTime.opThread = NULL;
-    chVTReset(&runTime.vt);
+  if(ap_runTime.opThread){
+    chThdTerminate(ap_runTime.opThread);
+    chThdWait(ap_runTime.opThread);
+    ap_runTime.opThread = NULL;
+    chVTReset(&ap_runTime.vt);
+  }
+  if(ap_runTime.calThread){
+    chThdTerminate(ap_runTime.calThread);
+    chThdWait(ap_runTime.calThread);
+    ap_runTime.calThread = NULL;
   }
 }
 
 static void startTransfer(BaseSequentialStream *stream)
 {
-  if(!runTime.opThread){
-
-    runTime.ledBlink.ms_off = 200;
-    runTime.ledBlink.ms_on = 500;
-    //chVTSet(&runTime.vt,TIME_MS2I(500),blink_cb,NULL);
-    runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO,procOperation,stream);
+  if(!ap_runTime.opThread){
+    ap_runTime.ledBlink.ms_off = 200;
+    ap_runTime.ledBlink.ms_on = 500;
+    //chVTSet(&ap_runTime.vt,TIME_MS2I(500),blink_cb,NULL);
+    ap_runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO,procOperation,stream);
+    ap_runTime.calThread = chThdCreateStatic(waCalc,sizeof(waCalc),NORMALPRIO-1,procCalc,stream);
   }
   else{
     stopTransfer();
@@ -736,19 +794,19 @@ static const WDGConfig wdgcfg = {
 void vnode_app_init()
 {
   app_nvmParam = &nvmParam;
-  app_runTime = &runTime;
+  app_runTime = &ap_runTime;
   at24eep_init(&I2CD1,32,1024,0x50,2);
   load_settings();
   
   // start modbus slave
   mbPortInit(&nvmParam.mbParam);
-  chVTObjectInit(&runTime.vt);
+  chVTObjectInit(&ap_runTime.vt);
   
-  runTime.ledBlink.countDown = 0;
-  runTime.ledBlink.port = GPIOA;
-  runTime.ledBlink.pad = 8;
-  chVTObjectInit(&runTime.blinker);;
-  chVTSet(&runTime.blinker,TIME_MS2I(100),blink_cb,NULL);
+  ap_runTime.ledBlink.countDown = 0;
+  ap_runTime.ledBlink.port = GPIOA;
+  ap_runTime.ledBlink.pad = 8;
+  chVTObjectInit(&ap_runTime.blinker);;
+  chVTSet(&ap_runTime.blinker,TIME_MS2I(100),blink_cb,NULL);
   //nvmParam.nodeParam.activeSensor = SENSOR_ISM330;
   
   //nvmParam.nodeParam.activeSensor = SENSOR_BMI160;
@@ -758,7 +816,7 @@ void vnode_app_init()
     memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
     
     if(adxl355_init(&adxl) == ADXL355_OK){
-      runTime.sensorReady = 1;
+      ap_runTime.sensorReady = 1;
       adxl355_powerup(&adxl);
       adxl355_powerdown(&adxl);
     }
@@ -768,13 +826,13 @@ void vnode_app_init()
     memcpy((uint8_t*)&ism330.config->gyro,(uint8_t*)&nvmParam.imuParam.gyro,sizeof(nvmParam.imuParam.gyro));
     
     if(ism330_init(&ism330) == MSG_OK){
-      runTime.sensorReady = SENSOR_ISM330;
+      ap_runTime.sensorReady = SENSOR_ISM330;
     }
   }
   
   else if(nvmParam.nodeParam.activeSensor == SENSOR_BMI160){   
     if(bmi160_dev_init(&bmi160) == MSG_OK){
-      runTime.sensorReady = SENSOR_BMI160;
+      ap_runTime.sensorReady = SENSOR_BMI160;
     }
     memcpy((uint8_t*)&bmi160.imu.accel_cfg,(uint8_t*)&nvmParam.imuParam.accel,sizeof(nvmParam.imuParam.accel));
     memcpy((uint8_t*)&bmi160.imu.gyro_cfg,(uint8_t*)&nvmParam.imuParam.gyro,sizeof(nvmParam.imuParam.gyro));
@@ -788,13 +846,14 @@ void vnode_app_init()
   
 
   //uint8_t tmp[320];
-  runTime.self = chThdGetSelfX();
+  ap_runTime.self = chThdGetSelfX();
   
-  timeDomainInit(&runTime.time);
-  runTime.time.nofSamples = nvmParam.time.sampleNumber;
-  cmsis_fft_init(&runTime.fft_data);
+  timeDomainInit(&ap_runTime.time);
+  ap_runTime.time.nofSamples = NOF_SAMPLES;
+//  ap_runTime.time.nofSamples = nvmParam.time.sampleNumber;
+  cmsis_fft_init(&ap_runTime.fft_data);
   
-//  chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EVENT_MASK(1));
+//  chEvtRegisterMask(&SDFS1.evs_insertion, &ap_runTime.el_sdfs, EVENT_MASK(1));
   startTransfer(NULL);
   wdgStart(&WDGD1, &wdgcfg);
   while(1){
@@ -852,25 +911,25 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
   int16_t iv16;
   if(rw == 0){ // read
     if(RANGE_CHECK(address,0,5)){
-      uint8_t *sptr = (uint8_t*)&runTime.peak;
+      uint8_t *sptr = (uint8_t*)&ap_runTime.peak;
       sptr += address *2;
       memcpy(dptr,sptr,4);
       ret = 2;
     }
     else if(RANGE_CHECK(address,6,11)){
-      uint8_t *sptr = (uint8_t*)&runTime.rms;
+      uint8_t *sptr = (uint8_t*)&ap_runTime.rms;
       sptr += (address - 6) *2;
       memcpy(dptr,sptr,4);
       ret = 2;
     }
     else if(RANGE_CHECK(address,12,17)){
-      uint8_t *sptr = (uint8_t*)&runTime.crest;
+      uint8_t *sptr = (uint8_t*)&ap_runTime.crest;
       sptr += (address - 12) *2;
       memcpy(dptr,sptr,4);
       ret = 2;
     }
     else if(RANGE_CHECK(address,18,21)){
-      uint8_t *sptr = (uint8_t*)&runTime.temperature;
+      uint8_t *sptr = (uint8_t*)&ap_runTime.temperature;
       sptr += (address - 18) *2;
       memcpy(dptr,sptr,4);
       ret = 2;
@@ -973,18 +1032,18 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
     }
     else if(RANGE_CHECK(address,1021,1023)){
       if(address == 1021){
-        iv16 = runTime.max_bin_index + 1024;
+        iv16 = ap_runTime.max_bin_index + 1024;
         memcpy(dptr,(uint8_t *)&iv16,2);
         ret = 1;
       }
       else if(address == 1022){
-        mapMBFloat(dptr,(uint8_t*)&runTime.freq[0]);
+        mapMBFloat(dptr,(uint8_t*)&ap_runTime.freq[0]);
         ret = 2;
       }
       
     }
     else if(RANGE_CHECK(address,1024,3072)){
-      mapMBFloat(dptr,(uint8_t*)&runTime.fft_bins[(address - 1024)>>1]);
+      mapMBFloat(dptr,(uint8_t*)&ap_runTime.fft_bins[(address - 1024)>>1]);
       ret = 2;
     }
     else{
@@ -1141,8 +1200,8 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
     else if(address == 1021){
       mapMBWord((uint8_t*)&iv16,dptr);
       if(iv16 == 0xAA){
-        if(!runTime.fillFFT){
-          runTime.fillFFT = true;
+        if(!ap_runTime.fillFFT){
+          ap_runTime.fillFFT = true;
         }
       }
     }
@@ -1160,7 +1219,7 @@ int8_t vnode_modbus_handler(uint16_t address, uint8_t *dptr, uint8_t rw)
       save_settings(0);
     }
   }
-  runTime.ledBlink.countDown = 1000;
+  ap_runTime.ledBlink.countDown = 1000;
   return ret;
 }
 
@@ -1181,12 +1240,12 @@ static void adccallback(ADCDriver *adcp)
   
   for(uint8_t j=0;j<ADC_GRP1_NUM_CHANNELS;j++){
     if((chSum[j] < 100) || (chSum[j] > 4000)){
-      runTime.temperature[j] = 0;
+      ap_runTime.temperature[j] = 0;
     }
     else{
       float r = (float)(chSum[j])/(4096.);
-  //    runTime.temperature[j] = ntcGetTempFromRatioF_RTOP(r);
-      runTime.temperature[j] = ntcGetTempFromRatioF_RBOT(r);
+  //    ap_runTime.temperature[j] = ntcGetTempFromRatioF_RTOP(r);
+      ap_runTime.temperature[j] = ntcGetTempFromRatioF_RBOT(r);
     }
   }
   

@@ -12,8 +12,8 @@ define symbol __ICFEDIT_region_RAM_start__ = 0x20000000;
 define symbol __ICFEDIT_region_RAM_end__   = 0x2001FFFF;
 
 /*-Sizes-*/
-define symbol __ICFEDIT_size_cstack__ = 0xc00;               /* Size of the process stack */
-define symbol __ICFEDIT_size_heap__   = 0xc00;               /* Used to mark heap (heap + sysheap) maximum size limit */
+define symbol __ICFEDIT_size_cstack__ = 0x1000;                /* Size of the process stack */
+define symbol __ICFEDIT_size_heap__   = 0xc00;                 /* Used to mark heap (heap + sysheap) maximum size limit */
 /**** End of ICF editor section. ###ICF###*/
 
 /* Size of the IRQ Stack (Main Stack).*/

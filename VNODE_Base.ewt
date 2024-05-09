@@ -9935,6 +9935,12 @@
                 <name>$extsource$\ylib\adda\ad76xx\ad76_drv.h</name>
             </file>
             <file>
+                <name>$extsource$\ylib\adda\ads1x15\ads1015.c</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\adda\ads1x15\ads1015.h</name>
+            </file>
+            <file>
                 <name>$extsource$\ylib\sensor\adxl355\adxl355_defs.h</name>
             </file>
             <file>
