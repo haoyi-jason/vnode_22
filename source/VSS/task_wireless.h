@@ -1,6 +1,9 @@
 #ifndef _TASK_WIRELESS_
 #define _TASK_WIRELESS_
 
+#define COMM_TYPE_WIFI  0x80
+#define COMM_TYPE_BT    0x40
+
 #define GLOBAL_BUFF_LEN 8000
 #define RSI_APP_BUF_SIZE 600
 #define RSI_BT_TASK_STACK_SIZE 1024

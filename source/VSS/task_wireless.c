@@ -92,6 +92,17 @@ struct _nvmParam{
   struct wlan wlan;
   struct lan lan;
 };
+SerialWLANDriver SDW1;
+
+static SerialWLANConfig wconfig = {
+  COMM_TYPE_WIFI,
+  {0x00,0x00,0x00,0x00},
+};
+
+static SerialWLANConfig bconfig = {
+  COMM_TYPE_WIFI,
+  {0x00,0x00,0x00,0x00},
+};
 
 static struct _nvmParam nvmParam,*w_nvmParam=&nvmParam;
 static struct _runTime runTime, *w_runTime = &runTime;
@@ -436,6 +447,7 @@ void  rsi_wlan_sta_app_task(void *p)
       }else{
         runTime.clientSocket = new_socket;
         runTime.state = STA_CONNECTED;
+        chEvtBroadcastFlags(&SDW1.es,RSI_APP_EVENT_SPP_CONN);
         stage = 6;    
       }
       
@@ -450,14 +462,19 @@ void  rsi_wlan_sta_app_task(void *p)
           runTime.state = STA_DISCONNECTED;
           runTime.clientSocket = -1;
           stage = 5;
+          chEvtBroadcastFlags(&SDW1.es,RSI_APP_EVENT_SPP_DISCONN);
         }
         if(evt & SOCKET_TX){
           if(runTime.state == STA_CONNECTED && (runTime.clientSocket >=0)){
-            size_t n;
-            chSysLock();
-            uint8_t *buf = obqGetFullBufferI(&SDW1.oqueue,&n);
-            chSysUnlock();
-            status = rsi_send(runTime.clientSocket,buf, n, 0);
+//            size_t n;
+//            chSysLock();
+//            uint8_t *buf = obqGetFullBufferI(&SDW1.oqueue,&n);
+//            chSysUnlock();
+//            if(buf != NULL){
+//              status = rsi_send(runTime.clientSocket,buf, n, 0);
+//            }
+            rsi_send(runTime.clientSocket, runTime.buffer.buffer, runTime.buffer.size,0);
+            runTime.buffer.buff_in_use = 0;
           }
           if(status < 0){
             stage = 5;
@@ -483,6 +500,7 @@ void  rsi_wlan_sta_app_task(void *p)
 
         if(status != RSI_SUCCESS)
         {
+          errCode = status;
           break;
         }
         else
@@ -520,6 +538,7 @@ void  rsi_wlan_sta_app_task(void *p)
         status =  rsi_wlan_ap_start((int8_t *)str, 11, RSI_WPA2, RSI_CCMP, psk, 100, 4);
         if(status != RSI_SUCCESS)
         {
+          errCode = status;
           break;
         }
         stage = 4;
@@ -677,9 +696,9 @@ void start_driver_task(void)
 }
 int8_t rsi_wlan_init(void)
 {
-  int32_t status;
+  static int32_t status;
 
-//  nvmParam.wlan.wlan_mode &= 0x0F;
+  nvmParam.wlan.wlan_mode &= 0x0F; // always AP mode
   if(nvmParam.wlan.wlan_mode & WLAN_STA){
     status = rsi_wireless_init(RSI_WLAN_CLIENT_MODE, RSI_OPERMODE_WLAN_ONLY);
     if(status != RSI_SUCCESS)
@@ -700,7 +719,6 @@ int8_t rsi_wlan_init(void)
       status = rsi_wireless_deinit();
       chThdTerminate(runTime.rsi_handle.rsi_driver);
       chThdWait(runTime.rsi_handle.rsi_driver);
-      //chThdRelease(appParam.rsi_handle.rsi_driver);
       runTime.rsi_handle.rsi_driver = NULL;
       chThdSleepMilliseconds(100);
       status = rsi_device_init(RSI_LOAD_IMAGE_I_FW);
@@ -1090,7 +1108,6 @@ int32_t task_wireless_init(uint8_t commType)
   chThdSleepMilliseconds(100);
   palSetPad(GPIOA,3);
 #endif  
-  sdwObjectInit(&SDW1);
   
   status = rsi_driver_init(global_buf, GLOBAL_BUFF_LEN);
   
@@ -1109,11 +1126,14 @@ int32_t task_wireless_init(uint8_t commType)
   start_driver_task();
   //rsi_task_create(rsi_wireless_driver_task, "driver_task",RSI_DRIVER_TASK_STACK_SIZE, NULL, RSI_DRIVER_TASK_PRIORITY, &runTime.rsi_handle.rsi_driver);
   commType &= 0xF0;  
+  sdwObjectInit(&SDW1);
   if(commType == COMM_USE_WIFI){
     rsi_wlan_init();
+    sdwStart(&SDW1,&wconfig);
   }
   else if(commType == COMM_USE_BT){
     rsi_bts_init();
+    sdwStart(&SDW1,&bconfig);
   }
   return status;
 }
@@ -1121,12 +1141,7 @@ int32_t task_wireless_init(uint8_t commType)
 
 /** Interface implementation **/
 
-SerialWLANDriver SDW1;
 
-static SerialWLANConfig wconfig = {
-  0x10,
-  {0x00,0x00,0x00,0x00},
-};
 
 static size_t _write(void *ip, const uint8_t *bp, size_t n)
 {
@@ -1199,7 +1214,12 @@ static void obnotify(io_buffers_queue_t *bqp)
   runTime.buffer.size = n;
   runTime.buffer.buff_in_use = 1;
   obqReleaseEmptyBufferI(&SDW1.oqueue);
-  chEvtSignalI(runTime.self,RSI_APP_EVENT_SPP_TX);
+  if(sdwp->config->commType == COMM_TYPE_BT){
+    chEvtSignalI(runTime.self,RSI_APP_EVENT_SPP_TX);
+  }
+  else if(sdwp->config->commType == COMM_TYPE_WIFI){
+    chEvtSignalI(runTime.self,SOCKET_TX);
+  }
 }
 
 
@@ -1216,7 +1236,7 @@ void sdwObjectInit(SerialWLANDriver *sdwp)
 }
 void sdwStart(SerialWLANDriver *sdwp, const SerialWLANConfig *config)
 {
-  
+    sdwp->config = config;
 }
 void sdwStop(void)
 {
