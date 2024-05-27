@@ -7207,7 +7207,7 @@
                     <state>$PROJ_DIR$\include\VNODE_ST_Serial</state>
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\license</state>
                     <state>D:\SourceRespo\ChibiOS\chibios203\os\common\ports\ARMCMx</state>
-                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\startup\ARMCMx\devices\AT32F4xx</state>
+                    <state>D:\SourceRespo\ChibiOS\chibios203\os\common\startup\ARMCMx\devices\STM32F4xx</state>
                 </option>
                 <option>
                     <name>AExtraOptionsCheckV2</name>

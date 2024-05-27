@@ -100,7 +100,7 @@ static SerialWLANConfig wconfig = {
 };
 
 static SerialWLANConfig bconfig = {
-  COMM_TYPE_WIFI,
+  COMM_TYPE_BT,
   {0x00,0x00,0x00,0x00},
 };
 
