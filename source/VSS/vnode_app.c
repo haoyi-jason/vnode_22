@@ -33,7 +33,7 @@ static const ADCConversionGroup adcgrpcfg = {
 };
 
 
-#define NVM_FLAG        0xAC
+#define NVM_FLAG        0xAD
 struct _nvmParam{
   uint8_t flag;
   node_param_t nodeParam;
@@ -68,6 +68,8 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x00,0,0},cmd_config}, // node param
   {{0xab,0xba,0xA2,0x01,0,0},cmd_config}, // adxl param
   {{0xab,0xba,0xA2,0x40,0,0},cmd_config}, // module param
+  {{0xab,0xba,0xA2,0xC0,0,0},cmd_config}, // module param
+  {{0xab,0xba,0xA2,0xC1,0,0},cmd_config}, // reset all to default
   {{0xab,0xba,0xA2,0x43,0,0},cmd_config}, // wlan param
   {{0xab,0xba,0xA2,0x4F,0,0},cmd_config}, // user param
   {{0xab,0xba,0xA2,0x0E,0,0},cmd_config}, // RTC
@@ -156,7 +158,7 @@ static SPIConfig spicfg = {
   NULL,
   NULL,
   0,
-  SPI_CR1_BR_1
+  SPI_CR1_BR_2
 };
 
 _adxl_interface_t adxlInterface = {
@@ -509,7 +511,7 @@ static THD_FUNCTION(procOperation ,p)
   runTime.ledBlink.ms_on = 500;
   uint32_t fifo_size;
   eventmask_t evt;
-  runTime.rxSz = CMD_STRUCT_SZ + 4;
+  runTime.rxSz = CMD_STRUCT_SZ + 6;
   uint8_t packetIgnore = 2;
   if(runTime.transferSize != 0){
     runTime.totalSizeTransferred = 0;
@@ -900,7 +902,7 @@ static THD_FUNCTION(procADS1115,p){
     default:break;
     }
     
-    chThdSleepMilliseconds(100);
+    chThdSleepMilliseconds(1000);
   }
 }
 
@@ -960,7 +962,7 @@ void vnode_app_init()
   runTime.activeWlan = 0;
   uint16_t htu_data[2];
 
-  chThdCreateStatic(waADS1115, sizeof(waADS1115), NORMALPRIO, procADS1115, NULL);
+  chThdCreateStatic(waADS1115, sizeof(waADS1115), NORMALPRIO-1, procADS1115, NULL);
 
   while(1){
     eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_IMMEDIATE);
@@ -1163,6 +1165,10 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         // check for key to enable write module param
         // module param only avaliable for private use
         memcpy((uint8_t*)&nvmParam.moduleParam,&buffer[8], sizeof(nvmParam.moduleParam));
+        valid = true;
+        break;
+      case 0xC1:
+        load_default();
         valid = true;
         break;
       case 0x41: // SERIAL

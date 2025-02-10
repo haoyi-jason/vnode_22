@@ -9869,6 +9869,12 @@
                 <name>$extsource$\ylib\numeric\frequency\cmsis_fft.h</name>
             </file>
             <file>
+                <name>$extsource$\ylib\numeric\Filters\cmsis_fir.c</name>
+            </file>
+            <file>
+                <name>$extsource$\ylib\numeric\Filters\cmsis_fir.h</name>
+            </file>
+            <file>
                 <name>$extsource$\ylib\sensor\htud\htu2x.c</name>
             </file>
             <file>

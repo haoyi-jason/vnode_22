@@ -10,7 +10,8 @@
 #include "task_wireless.h"
 #include "task_storage.h"
 #include "ylib/sensor/htud/htu2x.h"
-
+#include "ylib/sensor/bmi160/bmi160_defs.h"
+#include "ylib/sensor/bmi160/bmi160_dev.h"
 
 #define ADC_GRP1_NUM_CHANNELS   3
 #define ADC_GRP1_BUF_DEPTH      8
@@ -38,6 +39,8 @@ struct _nvmParam{
   adxl355_cfg_t adxlParam;
   module_setting_t moduleParam;
 };
+
+
 
 static void startTransfer(BaseSequentialStream*);
 
@@ -121,6 +124,7 @@ struct _runTime{
   uint16_t blinkPeriod;
   systime_t elapsed;
   systime_t last;
+  uint16_t htu_data[2];
 };
 
 static struct _runTime runTime, *app_runTime;
@@ -151,6 +155,24 @@ static adxl355_config_t adxlConfig = {
 static ADXLDriver adxl = {
   &adxlInterface,
   &adxlConfig
+};
+
+_imu_interface_t bmiInterface = {
+  &SPID3,
+  &spicfg
+};
+
+static _bmi160_config_t bmiConfig = {
+  {0x0,BMI160_ACCEL_NORMAL_MODE,BMI160_ACCEL_RANGE_2G,0x0},
+  {0x0,BMI160_GYRO_NORMAL_MODE,BMI160_GYRO_RANGE_2000_DPS,0x0},
+  GPIOA,8,
+  GPIOA,11,
+  GPIOA,12
+};
+
+static BMI160Driver bmi160 = {
+  &bmiInterface,
+  &bmiConfig
 };
 
 const module_setting_t module_default = {
@@ -464,7 +486,8 @@ static THD_FUNCTION(procOperation ,p)
     adxl355_cmd_start(&adxl);  
   }
   else if(activeSensor == SENSOR_BMI160){
-    
+    bmi160_poweron(&bmi160);
+    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_ISM_FIFO_FULL);
   }
   else if(activeSensor == SENSOR_ISM330){
 //    chEvtRegisterMask(&runTime.es_sensor,&elSensor,EV_ISM_FIFO_FULL );
@@ -832,12 +855,12 @@ static const I2CConfig i2ccfg = {
 #define PCA9548_BASE_ADDR       0x70
 void pca_set_channel(uint8_t ch)
 {
-  msg_t ret;
+  static msg_t ret;
   i2cAcquireBus(&I2CD1);
   i2cStart(&I2CD1,&i2ccfg);
   uint8_t ucTx = (1 << ch);
   uint8_t adr = 0;
-  ret = i2cMasterTransmitTimeout(&I2CD1,PCA9548_BASE_ADDR + adr,&ucTx,1,NULL,0,TIME_MS2I(10));  
+  ret = i2cMasterTransmitTimeout(&I2CD1,PCA9548_BASE_ADDR + adr,&ucTx,1,NULL,0,TIME_MS2I(50));  
   i2cStop(&I2CD1);
   i2cReleaseBus(&I2CD1);
 }
@@ -871,12 +894,21 @@ void vnode_app_init()
   
   bincmd_shellInit();
   chVTObjectInit(&runTime.vt);
-  
+  uint8_t activeSensor = nvmParam.nodeParam.activeSensor;
   memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
-  if(adxl355_init(&adxl) == ADXL355_OK){
-    runTime.sensorReady = 1;
-    adxl355_powerup(&adxl);
-    adxl355_powerdown(&adxl);
+  if(activeSensor == SENSOR_ADXL355){
+    if(adxl355_init(&adxl) == ADXL355_OK){
+      runTime.sensorReady = SENSOR_ADXL355;
+      adxl355_powerup(&adxl);
+      adxl355_powerdown(&adxl);
+    }
+  }
+  else if(activeSensor == SENSOR_BMI160){
+    if(bmi160_dev_init(&bmi160) == MSG_OK){
+      runTime.sensorReady = SENSOR_BMI160;
+      uint8_t imudata[12];
+      bmi160_single_read(&bmi160,imudata,12,NULL);
+    }
   }
   runTime.shelltp = chThdCreateStatic(waShell, sizeof(waShell),NORMALPRIO+1,binshellProc,(void*)&shell_cfg);
 
@@ -894,6 +926,7 @@ void vnode_app_init()
   // start ADC for battery voltage measurment
   adcStart(&ADCD1,NULL);
   adcStartConversion(&ADCD1,&adcgrpcfg,runTime.samples,ADC_GRP1_BUF_DEPTH);
+  pca_set_channel(2);
   htu2xinit(&I2CD1,(I2CConfig*)&i2ccfg);
   static uint16_t cntr = 20;
   runTime.activeWlan = 0;
@@ -973,12 +1006,11 @@ void vnode_app_init()
       update_adc();
     }
     else if(cntr == 80){
-      pca_set_channel(2);
-      htu_data[0] = sen_htu2xx_read_temp_raw();
+      runTime.htu_data[0] = sen_htu2xx_read_temp_raw();
     }
     else if(cntr == 70){
-      htu_data[1] = sen_htu2xx_read_humidity_raw();  
-      memcpy(&runTime.buffer[CMD_STRUCT_SZ], (uint8_t*)&htu_data[0],4);
+      runTime.htu_data[1] = sen_htu2xx_read_humidity_raw();  
+      memcpy(&runTime.buffer[CMD_STRUCT_SZ], (uint8_t*)&runTime.htu_data[0],4);
     }
     chThdSleepMilliseconds(10);
   }
