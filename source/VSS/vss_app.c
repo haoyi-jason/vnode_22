@@ -32,12 +32,13 @@ static const ADCConversionGroup adcgrpcfg = {
 };
 
 
-#define NVM_FLAG        0xAC
+#define NVM_FLAG        0xAD
 struct _nvmParam{
   uint8_t flag;
   node_param_t nodeParam;
   adxl355_cfg_t adxlParam;
   module_setting_t moduleParam;
+  imu_config_t imuParam;
 };
 
 
@@ -68,6 +69,7 @@ void cmd_remove_file(BaseSequentialStream *chp, BinCommandHeader *header, uint8_
 BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x00,0,0},cmd_config}, // node param
   {{0xab,0xba,0xA2,0x01,0,0},cmd_config}, // adxl param
+  {{0xab,0xba,0xA2,0x02,0,0},cmd_config}, // imu param
   {{0xab,0xba,0xA2,0x40,0,0},cmd_config}, // module param
   {{0xab,0xba,0xA2,0x43,0,0},cmd_config}, // wlan param
   {{0xab,0xba,0xA2,0x4F,0,0},cmd_config}, // user param
@@ -98,6 +100,7 @@ struct _runTime{
   //uint8_t tmp[512];
   mutex_t mutex;
   uint16_t rxSz;
+  uint16_t rxWrSz;
   event_source_t es_sensor;
   event_listener_t el_sensor;
   event_listener_t el_sdfs;
@@ -239,6 +242,16 @@ static void load_default()
     nvmParam.adxlParam.fs = 0x1;
     nvmParam.adxlParam.odr = ADXL355_ODR_500;
     nvmParam.adxlParam.hpf = 0;
+    
+    nvmParam.imuParam.accel.lpf = BMI160_ACCEL_BW_NORMAL_AVG4;
+    nvmParam.imuParam.accel.odr = BMI160_ACCEL_ODR_800HZ;
+    nvmParam.imuParam.accel.power = BMI160_ACCEL_NORMAL_MODE;
+    nvmParam.imuParam.accel.range = BMI160_ACCEL_RANGE_2G;
+
+    nvmParam.imuParam.gyro.lpf = BMI160_GYRO_BW_NORMAL_MODE;
+    nvmParam.imuParam.gyro.odr = BMI160_GYRO_ODR_800HZ;
+    nvmParam.imuParam.gyro.power = BMI160_GYRO_NORMAL_MODE;
+    nvmParam.imuParam.gyro.range = BMI160_GYRO_RANGE_2000_DPS;
     
     memcpy((uint8_t*)&nvmParam.moduleParam,(uint8_t*)&module_default, sizeof(module_setting_t));
     //nvm_flash_write(OFFSET_NVM_CONFIG,(uint8_t*)&nvmParam,nvmSz);
@@ -465,6 +478,7 @@ static THD_FUNCTION(procOperation ,p)
   systime_t t_start;
   uint8_t pktCount = 0;
   static uint8_t adxl_sta;
+  uint16_t room_size;
  
   uint8_t opMode = nvmParam.nodeParam.opMode;
   uint8_t activeSensor = nvmParam.nodeParam.activeSensor;
@@ -474,7 +488,175 @@ static THD_FUNCTION(procOperation ,p)
 //  event_listener_t elSensor;
   eventflags_t flags;
   //activeSensor = SENSOR_ISM330;
-  activeSensor = SENSOR_ADXL355;
+  //activeSensor = SENSOR_ADXL355;
+  if(activeSensor == SENSOR_ADXL355){
+//    chEvtRegisterMask(&adxl.evsource,&runTime.el_sensor,EV_ADXL_FIFO_FULL);
+//    runTime.ledBlink.ms_on = 500;
+//    runTime.ledBlink.ms_off = 500;
+//    adxl355_get_fifo_size(&adxl,&sz);
+//    if(sz > 0){
+//      bStop = false;
+//    }
+    room_size = 288;
+    adxl355_cmd_start(&adxl);  
+  }
+  else if(activeSensor == SENSOR_BMI160){
+    room_size = 300;
+    bmi160_poweron(&bmi160);
+    bmi160_start(&bmi160);
+//    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_ISM_FIFO_FULL);
+  }
+  else if(activeSensor == SENSOR_ISM330){
+//    chEvtRegisterMask(&runTime.es_sensor,&elSensor,EV_ISM_FIFO_FULL );
+//    palSetLineCallback(LINE_ISM_INT,gpioa3_int_handler,NULL);
+//    palEnableLineEvent(LINE_ISM_INT,PAL_EVENT_MODE_RISING_EDGE);
+//    runTime.ledBlink.ms_on = 500;
+//    runTime.ledBlink.ms_off = 500;
+//    ism330_cmd_start_config();
+  }
+  
+//  uint8_t packetToIgnore = 5;
+//  if(runTime.resetBuffer != NULL){
+//    runTime.resetBuffer();
+//  }
+  runTime.ledBlink.ms_off = 500;
+  runTime.ledBlink.ms_on = 500;
+  uint32_t fifo_size;
+  eventmask_t evt;
+  runTime.rxSz = CMD_STRUCT_SZ + 6;
+  runTime.rxWrSz = room_size;
+  uint8_t packetIgnore = 2;
+  while(!bStop){
+    //evt = chEvtWaitAny(ALL_EVENTS);
+   // flags = chEvtGetAndClearFlags(&elSensor);
+    if(activeSensor == SENSOR_ADXL355){ // adxl 
+      adxl355_get_status(&adxl,&adxl_sta);
+      // read fifo data, sz indicate the number of records, not bytes
+      adxl355_get_fifo_size(&adxl,&sz);
+      fifo_size = 3*(sz/3);
+      
+      if(fifo_size){
+        uint16_t readSz = (fifo_size < runTime.rxWrSz)?fifo_size:runTime.rxWrSz;
+        adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],readSz);
+        runTime.rxSz += readSz;
+        if(runTime.rxWrSz == 0){                
+          header = (BinCommandHeader*)runTime.buffer;
+          header->magic1 = MAGIC1;
+          header->magic2 = MAGIC2;
+          header->type = MASK_DATA ;//| runTime.lbt;
+          header->len = 288 + CMD_STRUCT_SZ + 6;
+          header->pid = pktCount++;
+          header->chksum = checksum(runTime.buffer,header->len);
+          if(stream != NULL && packetIgnore==0){
+            if(stream == (BaseSequentialStream*)&SDFS1){
+              sdfs_insertData((FSDriver*)stream,runTime.buffer, header->len);
+            }
+            else if(stream == (BaseSequentialStream*)&SDW1){
+              //chSysLock();
+              streamWrite(stream,runTime.buffer, header->len);
+              //chSysUnlock();
+            }
+          }
+          runTime.rxSz = CMD_STRUCT_SZ + 6;
+          runTime.rxWrSz = room_size;
+          if(packetIgnore > 0)
+            packetIgnore--;
+        }
+      }
+      //A0_LO;
+    }
+    else if(activeSensor == SENSOR_BMI160){
+      uint16_t sz;
+      bmi160_fifo_read(&bmi160,buf,320,&sz);
+      if(sz){
+        uint16_t readSz = (sz < runTime.rxWrSz)? sz:runTime.rxWrSz;
+        memcpy(&runTime.buffer[runTime.rxSz], buf,readSz);
+        runTime.rxSz += readSz;
+        runTime.rxWrSz -= readSz;
+        if(runTime.rxWrSz == 0){
+          if(packetIgnore){
+            packetIgnore--;
+          }
+          else{
+            header = (BinCommandHeader*)runTime.buffer;
+            header->magic1 = MAGIC1;
+            header->magic2 = MAGIC2;
+            header->type = MASK_DATA;
+            header->len = 300 + CMD_STRUCT_SZ + 6;
+            header->pid = pktCount++;
+            header->chksum = checksum(runTime.buffer,header->len);
+            if(stream != NULL && packetIgnore==0){
+              if(stream == (BaseSequentialStream*)&SDFS1){
+                sdfs_insertData((FSDriver*)stream,runTime.buffer, header->len);
+              }
+              else if(stream == (BaseSequentialStream*)&SDW1){
+                //chSysLock();
+                streamWrite(stream,runTime.buffer, header->len);
+                //chSysUnlock();
+              }
+            }
+          }
+          runTime.rxSz = CMD_STRUCT_SZ + 6;
+          runTime.rxWrSz = room_size;
+          
+          if(sz > readSz){
+            memcpy(&runTime.buffer[runTime.rxSz],&buf[readSz], sz - readSz);
+            runTime.rxSz += (sz - readSz);
+            runTime.rxWrSz -= (sz - readSz);
+          }
+        }
+      }
+    }
+    bStop = chThdShouldTerminateX();
+    if(bStop){
+      if(activeSensor == SENSOR_ADXL355){
+        adxl355_cmd_stop(&adxl);  
+        // disable interrupt
+        runTime.ledBlink.ms_on = 500;
+        runTime.ledBlink.ms_off = 500;
+        //chEvtUnregister(&runTime.es_sensor,&elSensor);
+      }
+      else if(activeSensor == SENSOR_ISM330){
+        bmi160_stop(&bmi160);
+      }
+      else if(activeSensor == SENSOR_ISM330){
+        //palDisableLineEvent(LINE_ISM_INT);
+        //ism330_cmd_stop_config();
+        //chEvtUnregister(&runTime.es_sensor,&elSensor);
+      }
+      runTime.ledBlink.ms_on = 1000;
+      runTime.ledBlink.ms_off = 1000;
+    }
+    chThdSleepMilliseconds(5);
+  }
+//  chThdExit((msg_t)0);
+   // chEvtUnregister(&adxl.evsource,&runTime.el_sensor);
+  // turn off led
+  palClearPad(GPIOC,3);
+}
+static THD_FUNCTION(procOperation2 ,p)
+{
+  BinCommandHeader *header;
+  BaseSequentialStream *stream = p;
+  size_t sz;
+  uint8_t buf[320];
+  uint16_t bufSz = 0;
+  int32_t data[96];
+  uint8_t *p_src,*p_dst;
+  uint16_t bsz;
+  systime_t t_start;
+  uint8_t pktCount = 0;
+  static uint8_t adxl_sta;
+ 
+  uint8_t opMode = nvmParam.nodeParam.opMode;
+  uint8_t activeSensor = nvmParam.nodeParam.activeSensor;
+    
+  bool bStop = false;
+
+//  event_listener_t elSensor;
+  eventflags_t flags;
+  //activeSensor = SENSOR_ISM330;
+  //activeSensor = SENSOR_ADXL355;
   if(activeSensor == SENSOR_ADXL355){
     chEvtRegisterMask(&adxl.evsource,&runTime.el_sensor,EV_ADXL_FIFO_FULL);
 //    runTime.ledBlink.ms_on = 500;
@@ -895,8 +1077,8 @@ void vnode_app_init()
   bincmd_shellInit();
   chVTObjectInit(&runTime.vt);
   uint8_t activeSensor = nvmParam.nodeParam.activeSensor;
-  memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
   if(activeSensor == SENSOR_ADXL355){
+    memcpy((uint8_t*)adxl.config,(uint8_t*)&nvmParam.adxlParam,sizeof(nvmParam.adxlParam));
     if(adxl355_init(&adxl) == ADXL355_OK){
       runTime.sensorReady = SENSOR_ADXL355;
       adxl355_powerup(&adxl);
@@ -904,6 +1086,14 @@ void vnode_app_init()
     }
   }
   else if(activeSensor == SENSOR_BMI160){
+    bmi160.config->accel.power = nvmParam.imuParam.accel.power;
+    bmi160.config->accel.odr = nvmParam.imuParam.accel.odr;
+    bmi160.config->accel.fs = nvmParam.imuParam.accel.range;
+    bmi160.config->accel.lpf = nvmParam.imuParam.accel.lpf;
+    bmi160.config->gyro.power = nvmParam.imuParam.gyro.power;
+    bmi160.config->gyro.odr = nvmParam.imuParam.gyro.odr;
+    bmi160.config->gyro.fs = nvmParam.imuParam.gyro.range;
+    bmi160.config->gyro.lpf = nvmParam.imuParam.gyro.lpf;
     if(bmi160_dev_init(&bmi160) == MSG_OK){
       runTime.sensorReady = SENSOR_BMI160;
       uint8_t imudata[12];
@@ -931,6 +1121,8 @@ void vnode_app_init()
   static uint16_t cntr = 20;
   runTime.activeWlan = 0;
   uint16_t htu_data[2];
+  
+  //startTransfer(NULL);
   while(1){
     eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_IMMEDIATE);
     eventflags_t flags = chEvtGetAndClearFlags(&runTime.el_sdfs);
@@ -1039,6 +1231,9 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         valid = true;
         break;
       case 0x2: // IMU
+        memcpy(&buffer[8],(uint8_t*)&nvmParam.imuParam, sizeof(nvmParam.imuParam));
+        resp->len = sizeof(nvmParam.imuParam);
+        valid = true;
         break;
       case 0x3: // TIME
         break;
@@ -1118,6 +1313,9 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         valid = true;
         break;
       case 0x2: // IMU
+        memcpy((uint8_t*)&nvmParam.imuParam,&buffer[8], sizeof(nvmParam.imuParam));
+        memcpy((uint8_t*)adxl.config,&buffer[8], sizeof(nvmParam.imuParam));
+        valid = true;
         break;
       case 0x3: // TIME
         break;

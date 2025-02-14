@@ -9870,6 +9870,9 @@
             </file>
             <file>
                 <name>$extsource$\ylib\numeric\Filters\cmsis_fir.c</name>
+                <excluded>
+                    <configuration>VSS_PORT</configuration>
+                </excluded>
             </file>
             <file>
                 <name>$extsource$\ylib\numeric\Filters\cmsis_fir.h</name>

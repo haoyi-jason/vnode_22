@@ -697,7 +697,7 @@ void start_driver_task(void)
 int8_t rsi_wlan_init(void)
 {
   static int32_t status;
-
+  msg_t ret = MSG_RESET;
   nvmParam.wlan.wlan_mode &= 0x0F; // always AP mode
   if(nvmParam.wlan.wlan_mode & WLAN_STA){
     status = rsi_wireless_init(RSI_WLAN_CLIENT_MODE, RSI_OPERMODE_WLAN_ONLY);
@@ -709,9 +709,8 @@ int8_t rsi_wlan_init(void)
     rsi_task_create(rsi_wlan_sta_app_task, "wlan_task", RSI_WLAN_TASK_STACK_SIZE, NULL, RSI_WLAN_TASK_PRIORITY, &runTime.rsi_handle.rsi_wlan);
     // lock until thread finishing initial task
     chSysLock();
-    msg_t ret = chThdSuspendS(&runTime.trp);
+    ret = chThdSuspendS(&runTime.trp);
     chSysUnlock();
-    
     if(ret != MSG_OK){
       chThdSleepMilliseconds(100);
       chThdWait(runTime.rsi_handle.rsi_wlan);
@@ -721,32 +720,36 @@ int8_t rsi_wlan_init(void)
       chThdWait(runTime.rsi_handle.rsi_driver);
       runTime.rsi_handle.rsi_driver = NULL;
       chThdSleepMilliseconds(100);
-      status = rsi_device_init(RSI_LOAD_IMAGE_I_FW);
-      if(status != RSI_SUCCESS)
-      {
-        return -1;
-      }
-
-      //! Task created for Driver task
-      start_driver_task();
-      status = rsi_wireless_init(RSI_WLAN_AP_MODE, RSI_OPERMODE_WLAN_ONLY);
-      if(status != RSI_SUCCESS)
-      {
-        return -1;
-      }
-      runTime.wlan.execMode = EXEC_AP;
-      rsi_task_create(rsi_wlan_sta_app_task, "wlan_task", RSI_WLAN_TASK_STACK_SIZE, NULL, RSI_WLAN_TASK_PRIORITY, &runTime.rsi_handle.rsi_wlan);
     }
   }
-  else{
-    runTime.wlan.execMode = EXEC_AP;
+  if(ret != MSG_OK){ // try to enter AP mode
+    
+//    status = rsi_device_init(RSI_LOAD_IMAGE_I_FW);
+//    if(status != RSI_SUCCESS)
+//    {
+//      return -1;
+//    }
+//
+    //! Task created for Driver task
+    //start_driver_task();
     status = rsi_wireless_init(RSI_WLAN_AP_MODE, RSI_OPERMODE_WLAN_ONLY);
     if(status != RSI_SUCCESS)
     {
       return -1;
     }
+    runTime.wlan.execMode = EXEC_AP;
     rsi_task_create(rsi_wlan_sta_app_task, "wlan_task", RSI_WLAN_TASK_STACK_SIZE, NULL, RSI_WLAN_TASK_PRIORITY, &runTime.rsi_handle.rsi_wlan);
   }
+  
+//  else{
+//    runTime.wlan.execMode = EXEC_AP;
+//    status = rsi_wireless_init(RSI_WLAN_AP_MODE, RSI_OPERMODE_WLAN_ONLY);
+//    if(status != RSI_SUCCESS)
+//    {
+//      return -1;
+//    }
+//    rsi_task_create(rsi_wlan_sta_app_task, "wlan_task", RSI_WLAN_TASK_STACK_SIZE, NULL, RSI_WLAN_TASK_PRIORITY, &runTime.rsi_handle.rsi_wlan);
+//  }
   
 }
 //* End Wifi Section */
