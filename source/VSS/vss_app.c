@@ -72,6 +72,7 @@ BinShellCommand commands[] ={
   {{0xab,0xba,0xA2,0x02,0,0},cmd_config}, // imu param
   {{0xab,0xba,0xA2,0x40,0,0},cmd_config}, // module param
   {{0xab,0xba,0xA2,0x43,0,0},cmd_config}, // wlan param
+  {{0xab,0xba,0xA2,0x4E,0,0},cmd_config}, // user param
   {{0xab,0xba,0xA2,0x4F,0,0},cmd_config}, // user param
   {{0xab,0xba,0xA2,0x0E,0,0},cmd_config}, // RTC
   {{0xab,0xba,0xA1,0x01,0,0},cmd_start}, // start
@@ -282,8 +283,12 @@ static void writeLogHeader()
   char *ptr = runTime.buffer;
   size_t sz;
   memset(ptr,0,512);
-  
-  ptr += chsnprintf(ptr, 512, "VSS LOG FILE REV 1.0\n");
+  if(nvmParam.nodeParam.activeSensor == SENSOR_ADXL355){
+    ptr += chsnprintf(ptr, 512, "VSS LOG FILE REV 1.0\n");
+  }
+  else if(nvmParam.nodeParam.activeSensor == SENSOR_BMI160){
+    ptr += chsnprintf(ptr, 512, "VSS LOG FILE REV 1.0\n");
+  }
   
   if(nvmParam.nodeParam.activeSensor == SENSOR_ADXL355){
     ptr += chsnprintf(ptr,512,"SENSOR=ADXL355\n");
@@ -295,6 +300,33 @@ static void writeLogHeader()
     uint16_t odr = 4000/(1<<nvmParam.adxlParam.odr);
     ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
     ptr += chsnprintf(ptr,512,"HPF=0x%x\n",nvmParam.adxlParam.hpf);
+  }
+  else if(nvmParam.nodeParam.activeSensor == SENSOR_BMI160){
+    ptr += chsnprintf(ptr,512,"SENSOR=BMI160\n");
+    switch(nvmParam.imuParam.accel.range){
+    case 0x03:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=2 G\n");break;
+    case 0x05:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=4 G\n");break;
+    case 0x08:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=8 G\n");break;
+    case 0x0c:ptr += chsnprintf(ptr,512,"ACCEL_RANGE=16 G\n");break;
+    default: ptr += chsnprintf(ptr,512,"ACCEL_RANGE = WRONG\n");break;
+    }
+
+    uint16_t odr = 1600/((0x0C - nvmParam.imuParam.accel.odr) << 1);
+    ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
+    ptr += chsnprintf(ptr,512,"LPF=0x%x\n",nvmParam.imuParam.accel.lpf);
+
+    switch(nvmParam.imuParam.gyro.range){
+    case 0x00:ptr += chsnprintf(ptr,512,"GYRO_RANGE=2000 DPS\n");break;
+    case 0x01:ptr += chsnprintf(ptr,512,"GYRO_RANGE=1000 DPS\n");break;
+    case 0x02:ptr += chsnprintf(ptr,512,"GYRO_RANGE=500 DPS\n");break;
+    case 0x03:ptr += chsnprintf(ptr,512,"GYRO_RANGE=250 DPS\n");break;
+    case 0x04:ptr += chsnprintf(ptr,512,"GYRO_RANGE=125 DPS\n");break;
+    default: ptr += chsnprintf(ptr,512,"GYRO_RANGE = WRONG\n");break;
+    }
+
+    odr = 1600/((0x0C - nvmParam.imuParam.gyro.odr) << 1);
+    ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
+    ptr += chsnprintf(ptr,512,"LPF=0x%x\n",nvmParam.imuParam.gyro.lpf);
   }
   
   FRESULT fres;
@@ -356,63 +388,63 @@ static void finish_log_file()
     ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
     ptr += chsnprintf(ptr,512,"HPF=0x%x\n",nvmParam.adxlParam.hpf);
   }
-//  if(nvmParam.nodeParam.activeSensor & BMI160_ENABLED){
-//    ptr += chsnprintf(ptr,512,"SENSOR=BMI160\n");
-//    switch(appParam.imu.accel.range){
-//    case BMI160_ACCEL_RANGE_2G:
-//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=2 G\n");
-//      break;
-//    case BMI160_ACCEL_RANGE_4G:
-//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=4 G\n");
-//      break;
-//    case BMI160_ACCEL_RANGE_8G:
-//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=8 G\n");
-//      break;
-//    case BMI160_ACCEL_RANGE_16G:
-//      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=16 G\n");
-//      break;
-//    }
-//    switch(appParam.imu.gyro.range){
-//    case BMI160_GYRO_RANGE_2000_DPS:
-//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=2000 DPS\n");
-//      break;
-//    case BMI160_GYRO_RANGE_1000_DPS:
-//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=1000 DPS\n");
-//      break;
-//    case BMI160_GYRO_RANGE_500_DPS:
-//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=500 DPS\n");
-//      break;
-//    case BMI160_GYRO_RANGE_250_DPS:
-//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=250 DPS\n");
-//      break;
-//    case BMI160_GYRO_RANGE_125_DPS:
-//      ptr += chsnprintf(ptr,512,"GYRO_RANGE=125 DPS\n");
-//      break;
-//    }
-//    switch(appParam.imu.accel.odr){
-//    case BMI160_ACCEL_ODR_25HZ:
-//      ptr += chsnprintf(ptr,512,"DATA_RATE=25 SPS\n");
-//      break;
-//    case BMI160_ACCEL_ODR_50HZ:
-//      ptr += chsnprintf(ptr,512,"DATA_RATE=50 SPS\n");
-//      break;
-//    case BMI160_ACCEL_ODR_100HZ:
-//      ptr += chsnprintf(ptr,512,"DATA_RATE=100 SPS\n");
-//      break;
-//    case BMI160_ACCEL_ODR_200HZ:
-//      ptr += chsnprintf(ptr,512,"DATA_RATE=200 SPS\n");
-//      break;
-//    case BMI160_ACCEL_ODR_400HZ:
-//      ptr += chsnprintf(ptr,512,"DATA_RATE=400 SPS\n");
-//      break;
-//    case BMI160_ACCEL_ODR_800HZ:
-//      ptr += chsnprintf(ptr,512,"DATA_RATE=800 SPS\n");
-//      break;
-//    case BMI160_ACCEL_ODR_1600HZ:
-//      ptr += chsnprintf(ptr,512,"DATA_RATE=1600 SPS\n");
-//      break;
-//    }
-//  }  
+  else if(nvmParam.nodeParam.activeSensor == SENSOR_BMI160){
+    ptr += chsnprintf(ptr,512,"SENSOR=BMI160\n");
+    switch(nvmParam.imuParam.accel.range){
+    case BMI160_ACCEL_RANGE_2G:
+      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=2 G\n");
+      break;
+    case BMI160_ACCEL_RANGE_4G:
+      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=4 G\n");
+      break;
+    case BMI160_ACCEL_RANGE_8G:
+      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=8 G\n");
+      break;
+    case BMI160_ACCEL_RANGE_16G:
+      ptr += chsnprintf(ptr,512,"ACCEL_RANGE=16 G\n");
+      break;
+    }
+    switch(nvmParam.imuParam.gyro.range){
+    case BMI160_GYRO_RANGE_2000_DPS:
+      ptr += chsnprintf(ptr,512,"GYRO_RANGE=2000 DPS\n");
+      break;
+    case BMI160_GYRO_RANGE_1000_DPS:
+      ptr += chsnprintf(ptr,512,"GYRO_RANGE=1000 DPS\n");
+      break;
+    case BMI160_GYRO_RANGE_500_DPS:
+      ptr += chsnprintf(ptr,512,"GYRO_RANGE=500 DPS\n");
+      break;
+    case BMI160_GYRO_RANGE_250_DPS:
+      ptr += chsnprintf(ptr,512,"GYRO_RANGE=250 DPS\n");
+      break;
+    case BMI160_GYRO_RANGE_125_DPS:
+      ptr += chsnprintf(ptr,512,"GYRO_RANGE=125 DPS\n");
+      break;
+    }
+    switch(nvmParam.imuParam.accel.odr){
+    case BMI160_ACCEL_ODR_25HZ:
+      ptr += chsnprintf(ptr,512,"DATA_RATE=25 SPS\n");
+      break;
+    case BMI160_ACCEL_ODR_50HZ:
+      ptr += chsnprintf(ptr,512,"DATA_RATE=50 SPS\n");
+      break;
+    case BMI160_ACCEL_ODR_100HZ:
+      ptr += chsnprintf(ptr,512,"DATA_RATE=100 SPS\n");
+      break;
+    case BMI160_ACCEL_ODR_200HZ:
+      ptr += chsnprintf(ptr,512,"DATA_RATE=200 SPS\n");
+      break;
+    case BMI160_ACCEL_ODR_400HZ:
+      ptr += chsnprintf(ptr,512,"DATA_RATE=400 SPS\n");
+      break;
+    case BMI160_ACCEL_ODR_800HZ:
+      ptr += chsnprintf(ptr,512,"DATA_RATE=800 SPS\n");
+      break;
+    case BMI160_ACCEL_ODR_1600HZ:
+      ptr += chsnprintf(ptr,512,"DATA_RATE=1600 SPS\n");
+      break;
+    }
+  }  
   FIL f;
   FRESULT fres;
   fres = f_open(&f, runTime.logFile.writeFileName, FA_OPEN_APPEND | FA_WRITE);
@@ -433,7 +465,7 @@ static int8_t adxl355_cmd_start(ADXLDriver *dev)
   dev->config->intmask = ADXL355_INT_FULL_EN1;
   adxl355_set_filter(dev);
   adxl355_set_full_scale(dev);
-  adxl355_set_interrupt(dev);
+  //adxl355_set_interrupt(dev);
   
   switch(dev->config->fullscale){
   case 1:
@@ -461,7 +493,7 @@ static int8_t adxl355_cmd_start(ADXLDriver *dev)
 static int8_t adxl355_cmd_stop(ADXLDriver *dev)
 {
   dev->config->intmask = 0x0;
-  adxl355_set_interrupt(dev);  
+  //adxl355_set_interrupt(dev);  
   return adxl355_powerdown(dev);
 }
 static THD_WORKING_AREA(waOperation,1200);
@@ -498,10 +530,12 @@ static THD_FUNCTION(procOperation ,p)
 //      bStop = false;
 //    }
     room_size = 288;
+    SDFS1.packet_size = room_size + 14;
     adxl355_cmd_start(&adxl);  
   }
   else if(activeSensor == SENSOR_BMI160){
     room_size = 300;
+    SDFS1.packet_size = room_size + 14;
     bmi160_poweron(&bmi160);
     bmi160_start(&bmi160);
 //    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_ISM_FIFO_FULL);
@@ -533,34 +567,44 @@ static THD_FUNCTION(procOperation ,p)
       adxl355_get_status(&adxl,&adxl_sta);
       // read fifo data, sz indicate the number of records, not bytes
       adxl355_get_fifo_size(&adxl,&sz);
-      fifo_size = 3*(sz/3);
+      fifo_size = 9*(sz/9);
       
-      if(fifo_size){
+      if(fifo_size){ // read if > 10 samples
         uint16_t readSz = (fifo_size < runTime.rxWrSz)?fifo_size:runTime.rxWrSz;
         adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],readSz);
         runTime.rxSz += readSz;
-        if(runTime.rxWrSz == 0){                
-          header = (BinCommandHeader*)runTime.buffer;
-          header->magic1 = MAGIC1;
-          header->magic2 = MAGIC2;
-          header->type = MASK_DATA ;//| runTime.lbt;
-          header->len = 288 + CMD_STRUCT_SZ + 6;
-          header->pid = pktCount++;
-          header->chksum = checksum(runTime.buffer,header->len);
-          if(stream != NULL && packetIgnore==0){
-            if(stream == (BaseSequentialStream*)&SDFS1){
-              sdfs_insertData((FSDriver*)stream,runTime.buffer, header->len);
-            }
-            else if(stream == (BaseSequentialStream*)&SDW1){
-              //chSysLock();
-              streamWrite(stream,runTime.buffer, header->len);
-              //chSysUnlock();
+        runTime.rxWrSz -= readSz;
+        if(runTime.rxWrSz == 0){     
+          if(packetIgnore){
+            packetIgnore--;
+          }
+          else{
+            header = (BinCommandHeader*)runTime.buffer;
+            header->magic1 = MAGIC1;
+            header->magic2 = MAGIC2;
+            header->type = MASK_DATA ;//| runTime.lbt;
+            header->len = 288 + CMD_STRUCT_SZ + 6;
+            header->pid = pktCount++;
+            header->chksum = checksum(runTime.buffer,header->len);
+            if(stream != NULL && packetIgnore==0){
+              if(stream == (BaseSequentialStream*)&SDFS1){
+                sdfs_insertData((FSDriver*)stream,runTime.buffer, header->len);
+              }
+              else if(stream == (BaseSequentialStream*)&SDW1){
+                //chSysLock();
+                streamWrite(stream,runTime.buffer, header->len);
+                //chSysUnlock();
+              }
             }
           }
           runTime.rxSz = CMD_STRUCT_SZ + 6;
           runTime.rxWrSz = room_size;
-          if(packetIgnore > 0)
-            packetIgnore--;
+
+//          if(sz > readSz){
+//            memcpy(&runTime.buffer[runTime.rxSz],&buf[readSz], sz - readSz);
+//            runTime.rxSz += (sz - readSz);
+//            runTime.rxWrSz -= (sz - readSz);
+//          }
         }
       }
       //A0_LO;
@@ -611,6 +655,10 @@ static THD_FUNCTION(procOperation ,p)
     if(bStop){
       if(activeSensor == SENSOR_ADXL355){
         adxl355_cmd_stop(&adxl);  
+        adxl355_get_fifo_size(&adxl,&sz);
+        if(sz){
+          adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],sz);
+        }
         // disable interrupt
         runTime.ledBlink.ms_on = 500;
         runTime.ledBlink.ms_off = 500;
@@ -634,264 +682,7 @@ static THD_FUNCTION(procOperation ,p)
   // turn off led
   palClearPad(GPIOC,3);
 }
-static THD_FUNCTION(procOperation2 ,p)
-{
-  BinCommandHeader *header;
-  BaseSequentialStream *stream = p;
-  size_t sz;
-  uint8_t buf[320];
-  uint16_t bufSz = 0;
-  int32_t data[96];
-  uint8_t *p_src,*p_dst;
-  uint16_t bsz;
-  systime_t t_start;
-  uint8_t pktCount = 0;
-  static uint8_t adxl_sta;
- 
-  uint8_t opMode = nvmParam.nodeParam.opMode;
-  uint8_t activeSensor = nvmParam.nodeParam.activeSensor;
-    
-  bool bStop = false;
 
-//  event_listener_t elSensor;
-  eventflags_t flags;
-  //activeSensor = SENSOR_ISM330;
-  //activeSensor = SENSOR_ADXL355;
-  if(activeSensor == SENSOR_ADXL355){
-    chEvtRegisterMask(&adxl.evsource,&runTime.el_sensor,EV_ADXL_FIFO_FULL);
-//    runTime.ledBlink.ms_on = 500;
-//    runTime.ledBlink.ms_off = 500;
-    adxl355_get_fifo_size(&adxl,&sz);
-    if(sz > 0){
-      bStop = false;
-    }
-    adxl355_cmd_start(&adxl);  
-  }
-  else if(activeSensor == SENSOR_BMI160){
-    bmi160_poweron(&bmi160);
-    chEvtRegisterMask(&bmi160.evsource,&runTime.el_sensor,EV_ISM_FIFO_FULL);
-  }
-  else if(activeSensor == SENSOR_ISM330){
-//    chEvtRegisterMask(&runTime.es_sensor,&elSensor,EV_ISM_FIFO_FULL );
-//    palSetLineCallback(LINE_ISM_INT,gpioa3_int_handler,NULL);
-//    palEnableLineEvent(LINE_ISM_INT,PAL_EVENT_MODE_RISING_EDGE);
-//    runTime.ledBlink.ms_on = 500;
-//    runTime.ledBlink.ms_off = 500;
-//    ism330_cmd_start_config();
-  }
-  
-//  uint8_t packetToIgnore = 5;
-//  if(runTime.resetBuffer != NULL){
-//    runTime.resetBuffer();
-//  }
-  runTime.ledBlink.ms_off = 500;
-  runTime.ledBlink.ms_on = 500;
-  uint32_t fifo_size;
-  eventmask_t evt;
-  runTime.rxSz = CMD_STRUCT_SZ + 4;
-  uint8_t packetIgnore = 2;
-  while(!bStop){
-    evt = chEvtWaitAny(ALL_EVENTS);
-   // flags = chEvtGetAndClearFlags(&elSensor);
-    if(evt & EV_ADXL_FIFO_FULL){ // adxl int1, fifo full
-      adxl355_get_status(&adxl,&adxl_sta);
-      if((adxl_sta & 0x02) == 0x00) continue;
-      //A0_HI;
-      // read fifo data, sz indicate the number of records, not bytes
-      adxl355_get_fifo_size(&adxl,&sz);
-      fifo_size = sz;
-      sz /= 3;
-      if(sz){
-        switch(opMode){
-        case OP_STREAM:
-          bsz = sz*9; // read x/y/z combo
-          if(bsz < 144)
-            while(1);
-          if(bsz >= 144){
-            adxl355_read_fifo(&adxl,&runTime.buffer[runTime.rxSz],bsz); // each record has 9-bytes (x/y/z)*3
-            runTime.rxSz += bsz;
-            if(runTime.rxSz > 270){                
-                header = (BinCommandHeader*)runTime.buffer;
-                header->magic1 = MAGIC1;
-                header->magic2 = MAGIC2;
-                header->type = MASK_DATA ;//| runTime.lbt;
-                header->len = 288 + CMD_STRUCT_SZ + 6;
-                header->pid = pktCount++;
-                header->chksum = checksum(runTime.buffer,header->len);
-                if(stream != NULL && packetIgnore==0){
-                  if(stream == (BaseSequentialStream*)&SDFS1){
-                    sdfs_insertData((FSDriver*)stream,runTime.buffer, header->len);
-                  }
-                  else if(stream == (BaseSequentialStream*)&SDW1){
-                    //chSysLock();
-                    streamWrite(stream,runTime.buffer, header->len);
-                    //chSysUnlock();
-                  }
-                }
-                runTime.rxSz = CMD_STRUCT_SZ + 6;
-                if(packetIgnore > 0)
-                  packetIgnore--;
-              }
-          }
-          break;
-        case OP_VNODE:
-        case OP_OLED:
-//          bsz = sz*9;
-//          adxl355_read_fifo(&adxl,buf,bsz); // each record has 9-bytes (x/y/z)*3
-//          bsz = sz*4*3;
-//          p_src = buf;
-//          p_dst = (uint8_t*)data;
-//          p_dst += 3;
-//          for(uint16_t j=0;j<bsz;j++){
-//            if((j%4)==3){
-//              *(p_dst--)=0;
-//              p_dst = (uint8_t*)data + j + 4;
-//            }else{
-//              *(p_dst--)=*(p_src++);
-//            }
-//          }
-//          if(packetToIgnore){
-//            packetToIgnore--;
-//          }
-//          else if(feed_fifo32(&m_timeDomain,(uint8_t*)data,sz)==1){
-//            // update modbus data
-//            memcpy((void*)&runTime.rms,(void*)&m_timeDomain.rms,12);
-//            //memcpy((void*)&runTime.peak,(void*)&m_timeDomain.peak,12);
-//            memcpy((void*)&runTime.crest,(void*)&m_timeDomain.crest,12);
-//            memcpy((void*)&runTime.velocity,(void*)&m_timeDomain.velocity,12);
-//            runTime.peak.x = (m_timeDomain.peak.x - m_timeDomain.peakn.x);
-//            runTime.peak.y = (m_timeDomain.peak.y - m_timeDomain.peakn.y);
-//            runTime.peak.z = (m_timeDomain.peak.z - m_timeDomain.peakn.z);
-//            resetObject(&m_timeDomain);
-//            
-//            // send data via WIFI/BT
-//            // prepare data transmit
-//            if(opMode == OP_VNODE){
-//              header = (cmd_header_t*)buf;
-//              header->magic1 = MAGIC1;
-//              header->magic2 = MAGIC2;
-//              header->type = MASK_DATA;
-//              header->pid = pktCount++;
-//              uint8_t *ptr = &buf[CMD_STRUCT_SZ];
-//              memcpy(ptr,&runTime.peak,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.rms,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.crest,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.velocity,12);
-//              ptr += 12;
-//              header->len = 48 + CMD_STRUCT_SZ;
-//              header->chksum = cmd_checksum(buf,header->len);
-//              if(runTime.writefcn)
-//                runTime.writefcn(buf,header->len);
-//            }
-//            if(opMode == OP_OLED){
-//              if(nofSampleToIgnore) nofSampleToIgnore--;
-//              else{
-//                runTime.hisPEAK.x = (runTime.peak.x > runTime.hisPEAK.x)?runTime.peak.x:runTime.hisPEAK.x;
-//                runTime.hisPEAK.y = (runTime.peak.y > runTime.hisPEAK.y)?runTime.peak.y:runTime.hisPEAK.y;
-//                runTime.hisPEAK.z = (runTime.peak.z > runTime.hisPEAK.z)?runTime.peak.z:runTime.hisPEAK.z;
-//                runTime.hisRMS.x = (runTime.rms.x > runTime.hisRMS.x)?runTime.rms.x:runTime.hisRMS.x;
-//                runTime.hisRMS.y = (runTime.rms.y > runTime.hisRMS.y)?runTime.rms.y:runTime.hisRMS.y;
-//                runTime.hisRMS.z = (runTime.rms.z > runTime.hisRMS.z)?runTime.rms.z:runTime.hisRMS.z;
-//                chEvtSignal(runTime.dispThread,0x1);
-//              }
-//            }
-//          }
-          break;
-        }
-      }
-      //A0_LO;
-    }
-    if(flags & EV_ISM_FIFO_FULL){
-//      uint16_t sz;
-//        uint16_t readSz;
-//        switch(opMode){
-//        case OP_STREAM:
-//          if(ism330_cmd_fifo_read(&runTime.txBuf.buffer[CMD_STRUCT_SZ],300,&readSz)){
-//            if(packetToIgnore){
-//              packetToIgnore--;
-//            }
-//            else{
-//              runTime.txBuf.sz = readSz+CMD_STRUCT_SZ;
-//              header = (cmd_header_t*)runTime.txBuf.buffer;
-//              header->magic1 = MAGIC1;
-//              header->magic2 = MAGIC2;
-//              header->type = MASK_DATA | runTime.lbt;
-//              header->len = runTime.txBuf.sz;
-//              header->pid = pktCount++;
-//              header->chksum = cmd_checksum(runTime.txBuf.buffer,header->len);
-//              if(runTime.writefcn){
-//                runTime.writefcn(runTime.txBuf.buffer, header->len);
-//              }
-//            }
-//          }
-//          break;
-//        case OP_VNODE:
-//        case OP_OLED:
-//          if(ism330_cmd_fifo_read(buf,300,&readSz)){
-//            sz = readSz/12; // nof records
-//            if(packetToIgnore){
-//              packetToIgnore--;
-//            }
-//            else if(feed_fifo16_imu(&m_timeDomain,(uint8_t*)buf,sz)==1){
-//              memcpy((void*)&runTime.rms,(void*)&m_timeDomain.rms,12);
-//              memcpy((void*)&runTime.crest,(void*)&m_timeDomain.crest,12);
-//              memcpy((void*)&runTime.velocity,(void*)&m_timeDomain.velocity,12);
-//              runTime.peak.x = (m_timeDomain.peak.x - m_timeDomain.peakn.x);
-//              runTime.peak.y = (m_timeDomain.peak.y - m_timeDomain.peakn.y);
-//              runTime.peak.z = (m_timeDomain.peak.z - m_timeDomain.peakn.z);
-//              resetObject(&m_timeDomain);
-//              // send data via WIFI/BT
-//              header = (cmd_header_t*)buf;
-//              header->magic1 = MAGIC1;
-//              header->magic2 = MAGIC2;
-//              header->type = MASK_DATA;
-//              header->pid = pktCount++;
-//              uint8_t *ptr = &buf[CMD_STRUCT_SZ];
-//              memcpy(ptr,&runTime.peak,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.rms,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.crest,12);
-//              ptr += 12;
-//              memcpy(ptr,&runTime.velocity,12);
-//              ptr += 12;
-//              header->len = 48 + CMD_STRUCT_SZ;
-//              header->chksum = cmd_checksum(buf,header->len);
-//              if(runTime.writefcn){
-//                runTime.writefcn(buf,header->len);
-//              }
-//            }
-//          break;          
-//        }
-      }
-      
-    //}
-    bStop = chThdShouldTerminateX();
-    if(bStop){
-      if(activeSensor == SENSOR_ADXL355){
-        adxl355_cmd_stop(&adxl);  
-        // disable interrupt
-        runTime.ledBlink.ms_on = 500;
-        runTime.ledBlink.ms_off = 500;
-        //chEvtUnregister(&runTime.es_sensor,&elSensor);
-      }
-      else if(activeSensor == SENSOR_ISM330){
-        //palDisableLineEvent(LINE_ISM_INT);
-        //ism330_cmd_stop_config();
-        //chEvtUnregister(&runTime.es_sensor,&elSensor);
-      }
-      runTime.ledBlink.ms_on = 1000;
-      runTime.ledBlink.ms_off = 1000;
-    }
-  }
-//  chThdExit((msg_t)0);
-    chEvtUnregister(&adxl.evsource,&runTime.el_sensor);
-  // turn off led
-  palClearPad(GPIOC,3);
-}
 
 static void stopTransfer(void)
 {
@@ -1123,10 +914,33 @@ void vnode_app_init()
   uint16_t htu_data[2];
   
   //startTransfer(NULL);
+  
+//  uint8_t test_log = 1;
+//  uint8_t test_started = 0;
+//  uint32_t test_second = 200;
+//  systime_t test_start_time;
+  
   while(1){
     eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_IMMEDIATE);
     eventflags_t flags = chEvtGetAndClearFlags(&runTime.el_sdfs);
+//    if(test_log == 1){
+//      if(test_started == 0){
+//        //valid_log_fileName();
+//        startTransfer((BaseSequentialStream*)&SDFS1);      
+//        test_started = 1;
+//        test_start_time = chVTGetSystemTimeX();
+//      }
+//      else{
+//        uint32_t interval = TIME_I2S(chVTTimeElapsedSinceX(test_start_time));
+//        if(interval >= test_second){
+//          stopTransfer();
+//          test_log = 0;
+//        }
+//      }
+//      
+//    }
     if(flags & EV_SD_INS){// insert
+      chThdSleepMilliseconds(200);
       sdfs_loadCard(&SDFS1);
     }
     if(flags & EV_SD_WRITE){// write
@@ -1177,6 +991,7 @@ void vnode_app_init()
     }
 
     if(evt & EV_USER_BUTTON){
+      chThdSleepMilliseconds(200);
       startTransfer((BaseSequentialStream*)&SDFS1);
     }
 
@@ -1256,8 +1071,13 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         wireless_read_wlan_param(&buffer[8],&resp->len,256);
         valid = true;
         break;
-      case 0x4F: // USER PARAM
+      case 0x4E: // USER PARAM
         eepromRead(OFFSET_NVM_USER,256,&buffer[8]);
+        resp->len = 264;
+        valid = 1;
+        break;
+      case 0x4F: // USER PARAM
+        eepromRead(OFFSET_NVM_USER2,256,&buffer[8]);
         resp->len = 264;
         valid = 1;
         break;
@@ -1309,12 +1129,12 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         break;
       case 0x1: // ADXL
         memcpy((uint8_t*)&nvmParam.adxlParam,&buffer[8], sizeof(nvmParam.adxlParam));
-        memcpy((uint8_t*)adxl.config,&buffer[8], sizeof(nvmParam.adxlParam));
+        memcpy((uint8_t*)&adxl.config,&buffer[8], sizeof(nvmParam.adxlParam));
         valid = true;
         break;
       case 0x2: // IMU
         memcpy((uint8_t*)&nvmParam.imuParam,&buffer[8], sizeof(nvmParam.imuParam));
-        memcpy((uint8_t*)adxl.config,&buffer[8], sizeof(nvmParam.imuParam));
+        memcpy((uint8_t*)&bmi160.config,&buffer[8], sizeof(nvmParam.imuParam));
         valid = true;
         break;
       case 0x3: // TIME
@@ -1339,8 +1159,11 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         wireless_write_wlan_param(&buffer[8],header->len - CMD_STRUCT_SZ);
         valid = true;
         break;
-      case 0x4F: // USER PARAM
+      case 0x4E: // USER PARAM
         eepromWrite(OFFSET_NVM_USER,header->len - CMD_STRUCT_SZ,&buffer[8]);
+        break;
+      case 0x4F: // USER PARAM
+        eepromWrite(OFFSET_NVM_USER2,header->len - CMD_STRUCT_SZ,&buffer[8]);
         break;
       case 0x0E: // set rtc
         {

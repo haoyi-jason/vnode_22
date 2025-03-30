@@ -329,7 +329,8 @@ size_t sdfs_write(FSDriver *dev, char *fileName, uint8_t *buff, size_t sz)
     FIL f;
     FRESULT res = f_open(&f,fileName,FA_WRITE | FA_OPEN_APPEND);
     if(res == FR_OK){
-      res = f_write(&f,dev->ib[dev->brd++],302,&SZ);
+//      res = f_write(&f,dev->ib[dev->brd++],302,&SZ);
+      res = f_write(&f,dev->ib[dev->brd++],dev->packet_size,&SZ);
       SZ = f.obj.objsize;
       f_close(&f);
       if(dev->brd == NOF_BUFFER)

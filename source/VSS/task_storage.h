@@ -31,7 +31,7 @@ enum fs_actions{
 #define FILE_CLOSE         0x07
 
 #define NOF_BUFFER      3
-#define SD_BUF_SIZE     302
+#define SD_BUF_SIZE     320
 #define SD_BUF_HALF     SD_BUF_SIZE >> 1
 
 
@@ -54,7 +54,8 @@ typedef struct {
   uint8_t fileName[32]; \
   uint32_t readOffset; \
   int8_t bwr; \
-  int8_t brd;
+  int8_t brd; \
+  uint16_t packet_size;
     
 #define _fs_driver_methods     \
   _base_asynchronous_channel_methods
