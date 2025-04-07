@@ -72,7 +72,7 @@ struct FSDriver{
 //* External declarations **/
 extern FSDriver SDFS1;
 
-void sdfsInit(void);
+void sdfsInit();
 void sdfsObjectInit(FSDriver *sdfsp);
 void sdfsStart(FSDriver *sdfsp, const _SDCConfig *config);
 void sdfsStop(void);

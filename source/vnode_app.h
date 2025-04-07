@@ -24,7 +24,7 @@ enum {
   NOF_OP
 };
 
-typedef struct {
+typedef __packed struct  {
   uint8_t opMode;
   uint8_t commType;
   uint8_t activeSensor;

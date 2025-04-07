@@ -23,7 +23,7 @@ struct _nvmParam{
 static struct _runTime runTime, *storage_runTime;
 static struct _nvmParam nvmParam, *storage_nvmParam;
 
-static  _SDCConfig sdConfig = {
+static const _SDCConfig sdConfig = {
   &SDCD1,
   GPIOB,10
 };
@@ -95,9 +95,9 @@ bool fsReady(){
   return runTime.cardReady;
 }
 
-uint32_t capacity()
+uint32_t capacity(FSDriver *sdfsp)
 {
-  return SDFS1.config->dev->capacity;
+  return sdfsp->config->dev->capacity;
 }
 
 int8_t fs_write(uint8_t *d, uint16_t sz)
@@ -127,15 +127,15 @@ uint32_t fs_read(uint8_t *d, uint32_t offset, uint16_t sz)
   //chSysUnlock();  
 }
 
-int8_t fs_init()
+int8_t fs_init(FSDriver *sdfsp)
 {
 //  runTime.self = chThdCreateStatic(waFS,sizeof(waFS),NORMALPRIO,procFS,NULL);
 //  chSysLock();
 //  msg_t ret = chThdSuspendS(&runTime.trp);
 //  chSysUnlock();
   
-  sdfsObjectInit(&SDFS1);
-  sdfsStart(&SDFS1, &sdConfig);
+  sdfsObjectInit(sdfsp);
+  sdfsStart(sdfsp, &sdConfig);
   
   //if(ret != MSG_OK) return -1;
   
@@ -145,7 +145,7 @@ int8_t fs_init()
 
 /** Interface implementation **/
 
-FSDriver SDFS1;
+
 
 static size_t _write(void *ip, const uint8_t *bp, size_t n)
 {
@@ -278,7 +278,7 @@ void sdfsStart(FSDriver *sdfsp, const _SDCConfig *config)
   }
   
   chEvtObjectInit(&sdfsp->evs_insertion);
-  
+  chThdSleepMilliseconds(100);
   sdfs_loadCard(sdfsp);
   sdfsp->brd = 0;
   sdfsp->bwr = 0;
@@ -330,11 +330,13 @@ size_t sdfs_write(FSDriver *dev, char *fileName, uint8_t *buff, size_t sz)
     FRESULT res = f_open(&f,fileName,FA_WRITE | FA_OPEN_APPEND);
     if(res == FR_OK){
 //      res = f_write(&f,dev->ib[dev->brd++],302,&SZ);
-      res = f_write(&f,dev->ib[dev->brd++],dev->packet_size,&SZ);
-      SZ = f.obj.objsize;
+      while(dev->brd != dev->bwr){
+        res = f_write(&f,dev->ib[dev->brd++],dev->packet_size,&SZ);
+        if(dev->brd == NOF_BUFFER)
+          dev->brd = 0;
+      }
+      //SZ = f.obj.objsize;
       f_close(&f);
-      if(dev->brd == NOF_BUFFER)
-        dev->brd = 0;
     }
   }
   return SZ;

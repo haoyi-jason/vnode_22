@@ -17,7 +17,7 @@
 //#endif
 #include "rsi_app_bt_spp_slave.h"
 
-uint8_t global_buf[GLOBAL_BUFF_LEN] = {0};
+static uint8_t global_buf[GLOBAL_BUFF_LEN] = {0};
 
 #define NVM_FLAG        0xA2
 enum _state{
@@ -288,15 +288,76 @@ void  rsi_wlan_sta_app_task(void *p)
   bool bRun = true;
   uint8_t stage = 0;
   uint8_t wlan_role = nvmParam.wlan.wlan_mode;
-  if(runTime.wlan.execMode == EXEC_AP){ // AP mode
-    stage = 99;
-  }
   uint8_t chNo = 0x01; // <<-
   msg_t errCode = MSG_OK;
   rsi_rsp_scan_t *scan = (rsi_rsp_scan_t*)runTime.buffer.buffer;
   thread_t *udpThread = NULL;
   bool udpActive = false;
   rsi_wlan_app_callbacks_init();
+  
+  static systime_t dt;
+  dt = chVTGetSystemTimeX();
+  static uint32_t us1,us2;
+  
+  if(runTime.wlan.execMode == EXEC_AP){ // AP mode
+    //! Configure IP 
+    status = rsi_config_ipaddress(RSI_IP_VERSION_4, RSI_STATIC, (uint8_t *)&ip, (uint8_t *)&mask, (uint8_t *)&gw, NULL, 0,0);
+    if(status != RSI_SUCCESS){
+      
+    }
+    else{
+      
+    }
+    //! Get MAC address of the Access point
+    status = rsi_wlan_get(RSI_MAC_ADDRESS, runTime.wlan.device_params.module_mac_addr, MAC_ADDRESS_SIZE);
+
+    if(status != RSI_SUCCESS)
+    {
+      errCode = status;
+      chThdExit(MSG_RESET);
+    }
+    else
+    {
+      //! update wlan application state
+      runTime.wlan.state = RSI_WLAN_AP_UP_STATE; 
+    }
+    //! Start Access point
+    int8_t str_bd_addr[18],str[32],psk[32];
+    rsi_6byte_dev_address_to_ascii ((int8_t *)str_bd_addr, runTime.wlan.device_params.module_mac_addr);
+    str_bd_addr[17] = 0x0;
+    uint8_t lenSz;
+    uint8_t *wptr = str;
+    uint8_t *q = runTime.wlan.device_params.module_mac_addr;
+    wptr += sprintf(wptr,"%s",nvmParam.wlan.prefix1);
+    uint8_t digits = runTime.commType & 0xf;
+    if(digits){
+      wptr += sprintf(wptr,"-");
+      for(uint8_t i=0;i<digits;i++){
+        wptr += sprintf(wptr,"%02X",*q++);
+      }
+    }
+    lenSz = wptr - str;
+    if(lenSz > 32)
+      str[31] = 0x0;
+    else
+      str[lenSz] = 0x0;
+    memcpy(psk,nvmParam.wlan.passwd1,strlen(nvmParam.wlan.passwd1));
+    psk[strlen(nvmParam.wlan.passwd1)] = 0x0;
+    if(psk[0] == 0x0){
+      sprintf(psk,"53290921\0");
+    }
+//        status =  rsi_wlan_ap_start((int8_t *)SSID, CHANNEL_NO, SECURITY_TYPE, ENCRYPTION_TYPE, PSK, BEACON_INTERVAL, DTIM_COUNT);
+    status =  rsi_wlan_ap_start((int8_t *)str, 11, RSI_WPA2, RSI_CCMP, psk, 100, 4);
+//        us1 = TIME_I2US(chVTTimeElapsedSinceX(dt));
+    if(status != RSI_SUCCESS)
+    {
+      errCode = status;
+      chThdExit(MSG_RESET);
+    }
+    stage = 4;
+  }
+  
+  
   while(bRun)
   {
     switch(stage){
@@ -454,7 +515,8 @@ void  rsi_wlan_sta_app_task(void *p)
       break;
     case 6:
       {
-        eventmask_t evt = chEvtWaitAny(ALL_EVENTS);
+//        eventmask_t evt = chEvtWaitAny(ALL_EVENTS);
+        eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS,TIME_MS2I(10));
         if(evt & SOCKET_CONNECT){
           runTime.state = STA_CONNECTED;
         }
@@ -486,64 +548,6 @@ void  rsi_wlan_sta_app_task(void *p)
         }
       }
       break;
-    case 99: // ap mode
-        //! Configure IP 
-        status = rsi_config_ipaddress(RSI_IP_VERSION_4, RSI_STATIC, (uint8_t *)&ip, (uint8_t *)&mask, (uint8_t *)&gw, NULL, 0,0);
-        if(status != RSI_SUCCESS){
-          
-        }
-        else{
-          
-        }
-        //! Get MAC address of the Access point
-        status = rsi_wlan_get(RSI_MAC_ADDRESS, runTime.wlan.device_params.module_mac_addr, MAC_ADDRESS_SIZE);
-
-        if(status != RSI_SUCCESS)
-        {
-          errCode = status;
-          break;
-        }
-        else
-        {
-          //! update wlan application state
-          runTime.wlan.state = RSI_WLAN_AP_UP_STATE; 
-        }
-
-        //! Start Access point
-        int8_t str_bd_addr[18],str[32],psk[32];
-        rsi_6byte_dev_address_to_ascii ((int8_t *)str_bd_addr, runTime.wlan.device_params.module_mac_addr);
-        str_bd_addr[17] = 0x0;
-        uint8_t lenSz;
-        uint8_t *wptr = str;
-        uint8_t *q = runTime.wlan.device_params.module_mac_addr;
-        wptr += sprintf(wptr,"%s",nvmParam.wlan.prefix1);
-        uint8_t digits = runTime.commType & 0xf;
-        if(digits){
-          wptr += sprintf(wptr,"-");
-          for(uint8_t i=0;i<digits;i++){
-            wptr += sprintf(wptr,"%02X",*q++);
-          }
-        }
-        lenSz = wptr - str;
-        if(lenSz > 32)
-          str[31] = 0x0;
-        else
-          str[lenSz] = 0x0;
-        memcpy(psk,nvmParam.wlan.passwd1,strlen(nvmParam.wlan.passwd1));
-        psk[strlen(nvmParam.wlan.passwd1)] = 0x0;
-        if(psk[0] == 0x0){
-          sprintf(psk,"53290921\0");
-        }
-//        status =  rsi_wlan_ap_start((int8_t *)SSID, CHANNEL_NO, SECURITY_TYPE, ENCRYPTION_TYPE, PSK, BEACON_INTERVAL, DTIM_COUNT);
-        status =  rsi_wlan_ap_start((int8_t *)str, 11, RSI_WPA2, RSI_CCMP, psk, 100, 4);
-        if(status != RSI_SUCCESS)
-        {
-          errCode = status;
-          break;
-        }
-        stage = 4;
-
-      break;
     default:
       break;
     }
@@ -551,7 +555,7 @@ void  rsi_wlan_sta_app_task(void *p)
       bRun = false;
     }
     
-    chThdSleepMilliseconds(5);
+    chThdSleepMilliseconds(50);
   }
   
   chThdExit(errCode);
@@ -739,6 +743,9 @@ int8_t rsi_wlan_init(void)
     }
     runTime.wlan.execMode = EXEC_AP;
     rsi_task_create(rsi_wlan_sta_app_task, "wlan_task", RSI_WLAN_TASK_STACK_SIZE, NULL, RSI_WLAN_TASK_PRIORITY, &runTime.rsi_handle.rsi_wlan);
+//    chSysLock();
+//    chThdSuspendS(&runTime.trp);
+//    chSysUnlock();
   }
   
 //  else{

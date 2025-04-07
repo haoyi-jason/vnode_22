@@ -47,7 +47,7 @@ static void startTransfer(BaseSequentialStream*);
 
 static struct _nvmParam nvmParam, *app_nvmParam;
 
-#define SHELL_WA_SIZE   THD_WORKING_AREA_SIZE(2048)
+#define SHELL_WA_SIZE   THD_WORKING_AREA_SIZE(1024)
 
 #define EV_ADXL_FIFO_FULL EVENT_MASK(0)
 #define EV_ISM_FIFO_FULL EVENT_MASK(1)
@@ -132,7 +132,7 @@ struct _runTime{
 };
 
 static struct _runTime runTime, *app_runTime;
-
+static FSDriver SDFS1;;
 static SPIConfig spicfg = {
   false,
   NULL,
@@ -496,7 +496,7 @@ static int8_t adxl355_cmd_stop(ADXLDriver *dev)
   //adxl355_set_interrupt(dev);  
   return adxl355_powerdown(dev);
 }
-static THD_WORKING_AREA(waOperation,1200);
+static THD_WORKING_AREA(waOperation,2048);
 static THD_FUNCTION(procOperation ,p)
 {
   BinCommandHeader *header;
@@ -707,6 +707,13 @@ static void stopTransfer(void)
       writeLogHeader();
     }
   }
+  if(runTime.activeWlan == 0){
+    chVTReset(&runTime.vt);
+    palSetPad(GPIOC,3);
+  }
+  else{
+    runTime.blinkPeriod = 1000;
+  }
 }
 
 static void startTransfer(BaseSequentialStream *stream)
@@ -722,6 +729,11 @@ static void startTransfer(BaseSequentialStream *stream)
   }
   else{
     stopTransfer();
+//    if(stream == (BaseSequentialStream*)&SDFS1){
+//      runTime.blinkPeriod = 1000;
+//    }
+//    else{
+//    }
   }
 }
 
@@ -839,8 +851,8 @@ void pca_set_channel(uint8_t ch)
 }
 
 
-static THD_WORKING_AREA(waShell,1024);
 #define SHELL_WA_SIZE   1024
+static THD_WORKING_AREA(waShell,SHELL_WA_SIZE);
 void vnode_app_init()
 {
   app_nvmParam = &nvmParam;
@@ -860,6 +872,7 @@ void vnode_app_init()
   }
   
   // start wireless
+  //nvmParam.nodeParam.commType = 0x80;
   task_wireless_init(nvmParam.nodeParam.commType);
 //  task_wireless_init(COMM_USE_WIFI);
   
@@ -894,7 +907,7 @@ void vnode_app_init()
   runTime.shelltp = chThdCreateStatic(waShell, sizeof(waShell),NORMALPRIO+1,binshellProc,(void*)&shell_cfg);
 
   // start SD Logger
-  fs_init();
+  fs_init(&SDFS1);
   //uint8_t tmp[320];
   chEvtRegisterMask(&SDFS1.evs_insertion, &runTime.el_sdfs, EV_SD_INS | EV_SD_WRITE);
   chEvtRegisterMask(&SDW1.es, &runTime.el_wireless,RSI_APP_EVENT_SPP_CONN | RSI_APP_EVENT_SPP_DISCONN );
@@ -1129,12 +1142,12 @@ void cmd_config(BaseSequentialStream *chp, BinCommandHeader *hin, uint8_t *data)
         break;
       case 0x1: // ADXL
         memcpy((uint8_t*)&nvmParam.adxlParam,&buffer[8], sizeof(nvmParam.adxlParam));
-        memcpy((uint8_t*)&adxl.config,&buffer[8], sizeof(nvmParam.adxlParam));
+        memcpy((uint8_t*)adxl.config,&buffer[8], sizeof(nvmParam.adxlParam));
         valid = true;
         break;
       case 0x2: // IMU
         memcpy((uint8_t*)&nvmParam.imuParam,&buffer[8], sizeof(nvmParam.imuParam));
-        memcpy((uint8_t*)&bmi160.config,&buffer[8], sizeof(nvmParam.imuParam));
+        memcpy((uint8_t*)bmi160.config,&buffer[8], sizeof(nvmParam.imuParam));
         valid = true;
         break;
       case 0x3: // TIME

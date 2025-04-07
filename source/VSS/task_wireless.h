@@ -11,7 +11,7 @@
 #define WLAN_AP         0x0
 #define WLAN_STA        0x10
 
-#define GLOBAL_BUFF_LEN       8000
+//#define GLOBAL_BUFF_LEN       8000
 
 #define WLAN_STA_STATIC 0x10
 #define WLAN_STA_DHCP   0x11
@@ -22,9 +22,12 @@
 #define RSI_WLAN_AP_MODE    6
 //#define RSI_WLAN_CLIENT_MODE    0
 #define RSI_WLAN_TASK_STACK_SIZE  1024
-#define RSI_WLAN_TASK_PRIORITY   64
+#define RSI_WLAN_TASK_PRIORITY   NORMALPRIO
 #define RSI_DRIVER_TASK_PRIORITY   NORMALPRIO
 #define RSI_DRIVER_TASK_STACK_SIZE  256
+
+#define SSID    "GRIDIDEA_VSS"
+#define PSK     "53290921"
 
 // WLAN Events
 #define  SOCKET_CONNECT         EVENT_MASK(0)
