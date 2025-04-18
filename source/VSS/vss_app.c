@@ -129,6 +129,8 @@ struct _runTime{
   systime_t elapsed;
   systime_t last;
   uint16_t htu_data[2];
+  uint8_t logSd;
+  uint32_t fsErr;
 };
 
 static struct _runTime runTime, *app_runTime;
@@ -311,7 +313,7 @@ static void writeLogHeader()
     default: ptr += chsnprintf(ptr,512,"ACCEL_RANGE = WRONG\n");break;
     }
 
-    uint16_t odr = 1600/((0x0C - nvmParam.imuParam.accel.odr) << 1);
+    uint16_t odr = 1600/(1 << (0x0C - nvmParam.imuParam.accel.odr));
     ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
     ptr += chsnprintf(ptr,512,"LPF=0x%x\n",nvmParam.imuParam.accel.lpf);
 
@@ -324,7 +326,7 @@ static void writeLogHeader()
     default: ptr += chsnprintf(ptr,512,"GYRO_RANGE = WRONG\n");break;
     }
 
-    odr = 1600/((0x0C - nvmParam.imuParam.gyro.odr) << 1);
+    odr = 1600/(1 << (0x0C - nvmParam.imuParam.gyro.odr));
     ptr += chsnprintf(ptr,512,"DATA RATE=%d SPS\n",odr);
     ptr += chsnprintf(ptr,512,"LPF=0x%x\n",nvmParam.imuParam.gyro.lpf);
   }
@@ -720,9 +722,12 @@ static void startTransfer(BaseSequentialStream *stream)
 {
   if(!runTime.opThread){
     runTime.activeStream = stream;
+    runTime.logSd = 0;
     if(stream == (BaseSequentialStream*)&SDFS1){
       valid_log_fileName();
+      runTime.logSd = 1;
     }
+    
     runTime.blinkPeriod = 500;
     chVTSet(&runTime.vt,TIME_MS2I(runTime.blinkPeriod),blink_cb,NULL);
     runTime.opThread = chThdCreateStatic(waOperation,sizeof(waOperation),NORMALPRIO,procOperation,stream);
@@ -866,6 +871,7 @@ void vnode_app_init()
     cc++;
     if(cc > 10){
       load_default();
+      wireless_param_load_default();
       break;
     }
     chThdSleepMilliseconds(100);
@@ -927,7 +933,8 @@ void vnode_app_init()
   uint16_t htu_data[2];
   
   //startTransfer(NULL);
-  
+  //wireless_read_wlan_param(runTime.buffer,&cntr,256);
+
 //  uint8_t test_log = 1;
 //  uint8_t test_started = 0;
 //  uint32_t test_second = 200;
@@ -965,15 +972,22 @@ void vnode_app_init()
 //      }
     }
     
-    if(runTime.opThread != NULL){
+    if((runTime.opThread != NULL) && (runTime.logSd == 1)){
 //      size_t bsz = SDFS1.iqueue.q_counter;
 //      if(bsz >= 512) {
 //        size_t n;
 //        n = streamRead(&SDFS1,runTime.tmp,512);
-        if(sdfs_write(&SDFS1, runTime.logFile.writeFileName, 0, 0)> nvmParam.nodeParam.logFileSize){
+      runTime.fsErr = sdfs_write(&SDFS1, runTime.logFile.writeFileName, 0, 0);
+      if(runTime.fsErr == 0){
+        if(SDFS1.fileSize > nvmParam.nodeParam.logFileSize){
           writeLogHeader();
           valid_log_fileName();
         }
+      }
+      else{
+        stopTransfer();
+        runTime.blinkPeriod = 250;
+      }
 //      }
     }
 

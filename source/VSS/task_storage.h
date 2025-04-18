@@ -55,7 +55,8 @@ typedef struct {
   uint32_t readOffset; \
   int8_t bwr; \
   int8_t brd; \
-  uint16_t packet_size;
+  uint16_t packet_size; \
+  uint32_t fileSize;
     
 #define _fs_driver_methods     \
   _base_asynchronous_channel_methods

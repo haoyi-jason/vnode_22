@@ -19,7 +19,7 @@
 
 static uint8_t global_buf[GLOBAL_BUFF_LEN] = {0};
 
-#define NVM_FLAG        0xA2
+#define NVM_FLAG        0xA3
 enum _state{
   STA_NOT_INIT,
   STA_INITIALIZING,
@@ -71,7 +71,7 @@ struct _runTime{
   }udp;
 };
 
-struct wlan{
+__packed struct  wlan{
   uint8_t wlan_mode;
   char prefix1[16];
   char passwd1[16];
@@ -87,7 +87,7 @@ struct lan{
   uint8_t gateway[4];
 };
 
-struct _nvmParam{
+__packed struct _nvmParam{
   uint8_t flag;
   struct wlan wlan;
   struct lan lan;

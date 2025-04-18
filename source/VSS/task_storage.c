@@ -324,10 +324,10 @@ size_t sdfs_write(FSDriver *dev, char *fileName, uint8_t *buff, size_t sz)
 {
   if(!dev->cardReady) return 0;
   UINT SZ = 0;
-  
+  FRESULT res = FR_OK;
   if(dev->brd != dev->bwr){
     FIL f;
-    FRESULT res = f_open(&f,fileName,FA_WRITE | FA_OPEN_APPEND);
+    res = f_open(&f,fileName,FA_WRITE | FA_OPEN_APPEND);
     if(res == FR_OK){
 //      res = f_write(&f,dev->ib[dev->brd++],302,&SZ);
       while(dev->brd != dev->bwr){
@@ -336,10 +336,11 @@ size_t sdfs_write(FSDriver *dev, char *fileName, uint8_t *buff, size_t sz)
           dev->brd = 0;
       }
       //SZ = f.obj.objsize;
+      dev->fileSize = f.obj.objsize;
       f_close(&f);
     }
   }
-  return SZ;
+  return res;
 }
 
 size_t sdfs_read(FSDriver *dev, char *fileName, uint32_t offset, size_t readCount)
